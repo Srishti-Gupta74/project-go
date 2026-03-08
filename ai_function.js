@@ -91,12 +91,7 @@ If you don't know real centers in ${city}, generate 3 realistic fictional ones t
 };
 
 // ── Main handler ─────────────────────────────────────────────────────────────
-exports.handler = async (event) => {
-  // Only allow POST
-  if (event.httpMethod !== "POST") {
-    return { statusCode: 405, body: JSON.stringify({ error: "Method not allowed" }) };
-  }
-
+export const handler = async (event) => {
   // CORS headers — allows your frontend to call this
   const headers = {
     "Access-Control-Allow-Origin": "*",
@@ -104,9 +99,14 @@ exports.handler = async (event) => {
     "Content-Type": "application/json",
   };
 
-  // Handle preflight
+  // Handle preflight (must be before POST check)
   if (event.httpMethod === "OPTIONS") {
     return { statusCode: 200, headers, body: "" };
+  }
+
+  // Only allow POST
+  if (event.httpMethod !== "POST") {
+    return { statusCode: 405, headers, body: JSON.stringify({ error: "Method not allowed" }) };
   }
 
   const apiKey = process.env.GEMINI_API_KEY;

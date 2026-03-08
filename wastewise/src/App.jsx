@@ -454,11 +454,12 @@ function ScannerPage({user, onScanComplete, t, isDark}) {
 
   const stopCamera=()=>{if(streamRef.current){streamRef.current.getTracks().forEach(t=>t.stop());streamRef.current=null;}};
   const flipCamera=()=>{const n=facingMode==="environment"?"user":"environment";setFacingMode(n);startCamera(n);};
-  const capturePhoto=()=>{
+  const capturePhoto=async()=>{
     if(!videoRef.current) return;
     const v=videoRef.current,c=document.createElement("canvas");
     c.width=v.videoWidth;c.height=v.videoHeight;c.getContext("2d").drawImage(v,0,0);
-    const d=c.toDataURL("image/jpeg",.92);
+    const raw=c.toDataURL("image/jpeg",.92);
+    const d=await compressImage(raw);
     setImage(d);setImgB64(d.split(",")[1]);
     setResult(null);setImpact(null);setError(null);setCenters(null);
     stopCamera();setInputMode("upload");
@@ -467,10 +468,32 @@ function ScannerPage({user, onScanComplete, t, isDark}) {
     if(mode==="camera"){setInputMode("camera");setImage(null);setImgB64(null);setResult(null);setImpact(null);setCenters(null);setTimeout(()=>startCamera(),120);}
     else{stopCamera();setInputMode("upload");}
   };
+  // ── Compress image to stay under Netlify's 1 MB body limit ──
+  const compressImage = (dataUrl, maxDim = 800, quality = 0.7) =>
+    new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        let { width: w, height: h } = img;
+        if (w > maxDim || h > maxDim) {
+          const scale = maxDim / Math.max(w, h);
+          w = Math.round(w * scale);
+          h = Math.round(h * scale);
+        }
+        const c = document.createElement("canvas");
+        c.width = w; c.height = h;
+        c.getContext("2d").drawImage(img, 0, 0, w, h);
+        resolve(c.toDataURL("image/jpeg", quality));
+      };
+      img.src = dataUrl;
+    });
+
   const processFile=useCallback((file)=>{
     if(!file||!file.type.startsWith("image/")) return;
     const r=new FileReader();
-    r.onload=(e)=>{setImage(e.target.result);setImgB64(e.target.result.split(",")[1]);setResult(null);setImpact(null);setError(null);setCenters(null);};
+    r.onload=async(e)=>{
+      const compressed = await compressImage(e.target.result);
+      setImage(compressed);setImgB64(compressed.split(",")[1]);setResult(null);setImpact(null);setError(null);setCenters(null);
+    };
     r.readAsDataURL(file);
   },[]);
 
@@ -481,7 +504,11 @@ function ScannerPage({user, onScanComplete, t, isDark}) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
-    if (!res.ok) throw new Error(`API error ${res.status}`);
+    if (!res.ok) {
+      const errBody = await res.text().catch(() => "");
+      console.error("API error", res.status, errBody);
+      throw new Error(errBody || `API error ${res.status}`);
+    }
     return res.json();
   };
 
@@ -495,7 +522,7 @@ function ScannerPage({user, onScanComplete, t, isDark}) {
       });
       setResult(data);
       fetchImpact(data.itemName, data.category, data);
-    } catch { setError("Could not analyze. Try a clearer photo."); }
+    } catch (err) { setError(err.message || "Could not analyze. Try a clearer photo."); }
     finally { setLoading(false); }
   };
 
