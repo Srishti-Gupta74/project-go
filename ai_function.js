@@ -2,7 +2,7 @@
 // This runs on Netlify's servers — your API key stays secret here.
 // The frontend calls /api/ai, Netlify routes it to this function.
 
-const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent";
+const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent";
 
 // ── Prompts ──────────────────────────────────────────────────────────────────
 const PROMPTS = {
