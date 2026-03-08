@@ -33,7 +33,7 @@ Project Go is an AI-powered waste classification agent. You photograph any piece
 
 ## 🤖 The AI Agent
 
-Project Go uses **Gemini 2.0 Flash** (via a secure Netlify serverless function) with three specialized agent calls:
+Project Go uses **Gemini 2.5 Flash** (via a secure Netlify serverless function) with three specialized agent calls:
 
 | Agent Call | What It Does |
 |------------|--------------|
@@ -50,7 +50,7 @@ The API key is **never exposed to the frontend** — all AI calls go through a N
 | Layer | Technology |
 |-------|-----------|
 | Frontend | React (Hooks), Recharts, pure CSS |
-| AI | Gemini 2.0 Flash (Vision + Text) |
+| AI | Gemini 2.5 Flash (Vision + Text) |
 | Backend | Netlify Serverless Functions (Node.js) |
 | Build | Vite |
 | Deployment | Netlify (CI/CD via GitHub) |
