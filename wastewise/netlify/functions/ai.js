@@ -167,7 +167,9 @@ export const handler = async (event) => {
     const geminiData = await geminiRes.json();
 
     // Extract text from Gemini response
-    const rawText = geminiData?.candidates?.[0]?.content?.parts?.[0]?.text || "";
+    // gemini-2.5-flash returns multiple parts (thinking + answer), so use the last text part
+    const parts = geminiData?.candidates?.[0]?.content?.parts || [];
+    const rawText = parts.filter(p => p.text).map(p => p.text).pop() || "";
 
     // Parse JSON — strip any accidental markdown fences
     const clean = rawText.replace(/```json|```/g, "").trim();
