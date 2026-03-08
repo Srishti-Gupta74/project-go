@@ -62,7 +62,7 @@ const SDGS = [
   { id:13, color:"#3f7e44", emoji:"🌡️", title:"Climate Action",        short:"Combat climate change and its impacts",     how:"Landfills are India's 3rd largest source of methane. Recycling directly cuts greenhouse gas emissions." },
   { id:14, color:"#0a97d9", emoji:"🌊", title:"Life Below Water",      short:"Conserve oceans and marine life",           how:"80% of ocean plastic comes from land. Every plastic bottle you recycle protects sea turtles and fish." },
   { id:15, color:"#56c02b", emoji:"🌿", title:"Life on Land",          short:"Protect terrestrial ecosystems",            how:"Paper recycling saves forests. India loses thousands of trees daily — your dry waste scan helps stop this." },
-  { id:17, color:"#19486a", emoji:"🤝", title:"Partnerships",          short:"Revitalize global partnerships",            how:"Apps like Project Go connect citizens, NGOs, and governments to build a circular economy together." },
+  { id:17, color:"#19486a", emoji:"🤝", title:"Partnerships",          short:"Revitalize global partnerships",            how:"Apps like Go connect citizens, NGOs, and governments to build a circular economy together." },
 ];
 
 
@@ -115,9 +115,9 @@ const REWARDS = [
   { id:"r5",  cost:60,  icon:"☀️", title:"Solar Lamp Donation",   subtitle:"for a rural family",        desc:"Donate a solar lamp to a family without electricity in rural Rajasthan via Frontier Markets.",                    tag:"Real Impact",    tagColor:"#fbbf24",  category:"planet"  },
   { id:"r6",  cost:20,  icon:"🛍️", title:"5% Off — GreenCart",    subtitle:"organic grocery app",       desc:"5% discount on your next GreenCart organic grocery order. Code valid for 30 days.",                             tag:"Discount",       tagColor:"#fb923c",  category:"coupon"  },
   { id:"r7",  cost:80,  icon:"🌊", title:"Clean 1kg of Ocean Plastic", subtitle:"via The Ocean Cleanup India", desc:"Fund the removal of 1 kg of plastic from Indian coastal waters. Receive a photo update.",                  tag:"Real Impact",    tagColor:"#4ade80",  category:"planet"  },
-  { id:"r8",  cost:35,  icon:"🎓", title:"Eco Hero Profile Badge",  subtitle:"on WasteWise",            desc:"Unlock a golden 'Eco Hero' frame on your WasteWise profile, visible to everyone.",                               tag:"Profile",        tagColor:"#c084fc",  category:"digital" },
+  { id:"r8",  cost:35,  icon:"🎓", title:"Eco Hero Profile Badge",  subtitle:"on Go",            desc:"Unlock a golden 'Eco Hero' frame on your Go profile, visible to everyone.",                               tag:"Profile",        tagColor:"#c084fc",  category:"digital" },
   { id:"r9",  cost:100, icon:"🌍", title:"Name a Tree Forest Plot", subtitle:"1m² in your name",        desc:"1 square metre of a reforestation zone is registered in your name. Includes digital land certificate.",            tag:"Premium",        tagColor:"#f87171",  category:"planet"  },
-  { id:"r10", cost:15,  icon:"💌", title:"Eco Wallpaper Pack",     subtitle:"12 nature wallpapers",      desc:"Download 12 stunning nature photography wallpapers for your phone and desktop. Exclusive to WasteWise users.",     tag:"Free Gift",      tagColor:"#4ade80",  category:"digital" },
+  { id:"r10", cost:15,  icon:"💌", title:"Eco Wallpaper Pack",     subtitle:"12 nature wallpapers",      desc:"Download 12 stunning nature photography wallpapers for your phone and desktop. Exclusive to Go users.",     tag:"Free Gift",      tagColor:"#4ade80",  category:"digital" },
 ];
 
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
@@ -1344,12 +1344,12 @@ function SDGPage({ t, isDark }) {
         <div style={{ position: "absolute", top: -20, right: -20, fontSize: 120, opacity: .05 }}>🌍</div>
         <div style={{ fontSize: 10, color: t.textDim, letterSpacing: 2.5, fontWeight: 700, fontFamily: "'Outfit',sans-serif", marginBottom: 6 }}>UNITED NATIONS</div>
         <div style={{ fontFamily: "'Fraunces',serif", fontSize: 26, fontWeight: 900, color: t.green, lineHeight: 1.1, marginBottom: 8 }}>Sustainable<br/>Development Goals</div>
-        <p style={{ fontSize: 13, color: t.textMid, fontFamily: "'Outfit',sans-serif", lineHeight: 1.7, margin: 0 }}>The UN&#39;s 17 SDGs are a blueprint to achieve a better future by 2030. <strong style={{ color: t.green }}>Every scan you make with Project Go directly contributes to these goals.</strong></p>
+        <p style={{ fontSize: 13, color: t.textMid, fontFamily: "'Outfit',sans-serif", lineHeight: 1.7, margin: 0 }}>The UN&#39;s 17 SDGs are a blueprint to achieve a better future by 2030. <strong style={{ color: t.green }}>Every scan you make with Go directly contributes to these goals.</strong></p>
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 12, background: isDark ? "rgba(74,222,128,.06)" : "rgba(22,163,74,.06)", border: `1px solid ${t.borderGreen}`, borderRadius: 16, padding: "14px 16px", marginBottom: 16 }}>
         <span style={{ fontSize: 28 }}>🎯</span>
         <div>
-          <div style={{ fontFamily: "'Outfit',sans-serif", fontSize: 13, fontWeight: 700, color: t.text }}>Project Go targets 11 of the 17 SDGs</div>
+          <div style={{ fontFamily: "'Outfit',sans-serif", fontSize: 13, fontWeight: 700, color: t.text }}>Go targets 11 of the 17 SDGs</div>
           <div style={{ fontSize: 12, color: t.textDim, fontFamily: "'Outfit',sans-serif" }}>Tap any goal below to see how your actions help</div>
         </div>
       </div>
@@ -1552,7 +1552,7 @@ function RewardsPage({user, t, isDark, totalPts, onSpend}) {
 // ═══════════════════════════════════════════════════════════════════════════════
 //  ROOT APP
 // ═══════════════════════════════════════════════════════════════════════════════
-export default function ProjectGo() {
+export default function App() {
   const [isDark, setIsDark] = useState(()=>ls.get("ww_dark",true));
   const [user, setUser]     = useState(()=>ls.get("ww_currentUser",null));
   const [page, setPage]     = useState("scan");
@@ -1711,7 +1711,7 @@ export default function ProjectGo() {
           {page==="rewards"  && <RewardsPage  user={user} t={t} isDark={isDark} totalPts={totalPts} onSpend={handleSpend}/>}
           {page==="sdg"      && <SDGPage t={t} isDark={isDark}/>}
           {page==="dashboard"&& <DashboardPage user={user} t={t} isDark={isDark}/>}
-          <p style={{textAlign:"center",color:t.textDim,fontSize:11,marginTop:32,letterSpacing:1.5,fontFamily:"'Outfit',sans-serif"}}>PROJECT GO · AGENTATHONX 2026 · INDIA 🌍</p>
+          <p style={{textAlign:"center",color:t.textDim,fontSize:11,marginTop:32,letterSpacing:1.5,fontFamily:"'Outfit',sans-serif"}}>GO · AGENTATHONX 2026 · INDIA 🌍</p>
         </div>
 
         {/* Right panel — desktop only quick stats */}
