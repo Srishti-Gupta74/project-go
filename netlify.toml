@@ -1,7 +1,8 @@
 [build]
+  base = "wastewise"
   command = "npm run build"
-  publish = "dist"
-  functions = "netlify/functions"
+  publish = "wastewise/dist"
+  functions = "wastewise/netlify/functions"
 
 [[redirects]]
   from = "/api/*"
