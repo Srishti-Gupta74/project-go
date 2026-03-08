@@ -149,10 +149,8 @@ export const handler = async (event) => {
   // Call Gemini
   try {
     // Disable thinking for gemini-2.5-flash to get clean JSON responses
-    geminiBody.generationConfig = {
-      ...geminiBody.generationConfig,
-      thinking: { thinkingBudget: 0 }
-    };
+    geminiBody.generationConfig = geminiBody.generationConfig || {};
+    geminiBody.generationConfig.thinkingConfig = { thinkingBudget: 0 };
 
     const geminiRes = await fetch(`${GEMINI_API_URL}?key=${apiKey}`, {
       method: "POST",
