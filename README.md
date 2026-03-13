@@ -2,7 +2,7 @@
 ### *Go Green. Go Clean. Go Smart.*
 
 > **AgentathonX 2026 — India's First Online Agentathon**  
-> Built solo by **Prakriti (Srishti Suman Gupta)** · BTech CSE Year 1
+> Built solo by Srishti Suman Gupta, BTech CSE Year 1
 
 ---
 
