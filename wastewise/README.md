@@ -1,4 +1,5 @@
-# G🌍 Project Go
+# G🌍
+Project Go
 ### *Go Green. Go Clean. Go Smart.*
 
 > **AgentathonX 2026 — India's First Online Agentathon**  
