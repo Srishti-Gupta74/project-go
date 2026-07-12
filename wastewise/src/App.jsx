@@ -1711,7 +1711,7 @@ export default function App() {
           {page==="rewards"  && <RewardsPage  user={user} t={t} isDark={isDark} totalPts={totalPts} onSpend={handleSpend}/>}
           {page==="sdg"      && <SDGPage t={t} isDark={isDark}/>}
           {page==="dashboard"&& <DashboardPage user={user} t={t} isDark={isDark}/>}
-          <p style={{textAlign:"center",color:t.textDim,fontSize:11,marginTop:32,letterSpacing:1.5,fontFamily:"'Outfit',sans-serif"}}>GO · AGENTATHONX 2026 · INDIA 🌍</p>
+          <p style={{textAlign:"center",color:t.textDim,fontSize:11,marginTop:32,letterSpacing:1.5,fontFamily:"'Outfit',sans-serif"}}>GO · INDIA 🌍</p>
         </div>
 
         {/* Right panel — desktop only quick stats */}
