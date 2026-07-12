@@ -791,11 +791,11 @@ function ScannerPage({user, onScanComplete, t, isDark}) {
                 {centers.length===0?(
                   <Card t={t} style={{padding:"18px",borderRadius:16,border:`1px solid ${t.blue}25`,textAlign:"center"}}>
                     <p style={{fontSize:13,color:t.textMid,margin:"0 0 12px 0",fontFamily:"'Outfit',sans-serif",lineHeight:1.5}}>
-                      🛡️ We strictly avoid inventing store names. We couldn't verify a guaranteed real kabadiwala / recycling store on Google Maps inside <b>{userCity||"your area"}</b>.
+                      🛡️ We strictly avoid inventing store names. We couldn't verify a guaranteed real kabadiwala / recycling store directly inside <b>{userCity||"your area"}</b> or surrounding main city right now.
                     </p>
                     <a href={`https://www.google.com/maps/search/${encodeURIComponent((result?.category==='dry'?'kabadiwala scrap dealer ':'recycling center ')+(userCity||''))}`} target="_blank" rel="noopener noreferrer"
                       style={{display:"inline-flex",alignItems:"center",gap:6,padding:"10px 16px",background:t.blue,borderRadius:12,color:"#fff",fontSize:13,fontWeight:700,textDecoration:"none",fontFamily:"'Outfit',sans-serif"}}>
-                      🗺️ Search "{result?.category==='dry'?'Kabadiwala':'Recycling Center'}" directly on Google Maps →
+                      🗺️ Search "{result?.category==='dry'?'Kabadiwala':'Recycling Center'}" near {userCity||"you"} on Google Maps →
                     </a>
                   </Card>
                 ):(
