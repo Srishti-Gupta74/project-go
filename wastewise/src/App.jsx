@@ -788,24 +788,36 @@ function ScannerPage({user, onScanComplete, t, isDark}) {
                     🔍 Update Area
                   </button>
                 </div>
-                {centers.map((c,i)=>(
-                  <Card key={i} className="ww-card-hover" t={t} style={{padding:"15px",borderRadius:16,marginBottom:9,border:`1px solid ${t.blue}18`}}>
-                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:5}}>
-                      <div style={{fontFamily:"'Outfit',sans-serif",fontSize:14,fontWeight:700,color:t.text,flex:1,paddingRight:8}}>{c.name}</div>
-                      <span style={{fontSize:11,color:t.blue,fontWeight:700,background:isDark?"rgba(96,165,250,.15)":"rgba(37,99,235,.1)",padding:"3px 9px",borderRadius:20,fontFamily:"'Outfit',sans-serif",flexShrink:0}}>#{i+1}</span>
-                    </div>
-                    <div style={{fontSize:12,color:t.green,fontWeight:600,marginBottom:8,fontFamily:"'Outfit',sans-serif"}}>♻️ {c.type}</div>
-                    <div style={{display:"flex",flexWrap:"wrap",gap:8,marginBottom:c.tip?8:10}}>
-                      <span style={{fontSize:11,color:t.textMid,fontFamily:"'Outfit',sans-serif"}}>📌 {c.address}</span>
-                      <span style={{fontSize:11,color:t.blue,fontWeight:600,fontFamily:"'Outfit',sans-serif"}}>🚶 {c.distance}</span>
-                    </div>
-                    {c.tip&&<div style={{fontSize:11,color:t.textMid,fontStyle:"italic",marginBottom:10,padding:"7px 10px",background:t.leaf2,borderRadius:8,fontFamily:"'Outfit',sans-serif"}}>💡 {c.tip}</div>}
-                    <a href={`https://www.google.com/maps/search/${encodeURIComponent(c.mapsQuery||c.name)}`} target="_blank" rel="noopener noreferrer"
-                      style={{display:"inline-flex",alignItems:"center",gap:6,padding:"7px 13px",background:isDark?"rgba(96,165,250,.12)":"rgba(37,99,235,.1)",border:`1px solid ${t.blue}30`,borderRadius:10,color:t.blue,fontSize:12,fontWeight:700,textDecoration:"none",fontFamily:"'Outfit',sans-serif"}}>
-                      🗺️ Open in Maps →
+                {centers.length===0?(
+                  <Card t={t} style={{padding:"18px",borderRadius:16,border:`1px solid ${t.blue}25`,textAlign:"center"}}>
+                    <p style={{fontSize:13,color:t.textMid,margin:"0 0 12px 0",fontFamily:"'Outfit',sans-serif",lineHeight:1.5}}>
+                      🛡️ We strictly avoid inventing store names. We couldn't verify a guaranteed real kabadiwala / recycling store on Google Maps inside <b>{userCity||"your area"}</b>.
+                    </p>
+                    <a href={`https://www.google.com/maps/search/${encodeURIComponent((result?.category==='dry'?'kabadiwala scrap dealer ':'recycling center ')+(userCity||''))}`} target="_blank" rel="noopener noreferrer"
+                      style={{display:"inline-flex",alignItems:"center",gap:6,padding:"10px 16px",background:t.blue,borderRadius:12,color:"#fff",fontSize:13,fontWeight:700,textDecoration:"none",fontFamily:"'Outfit',sans-serif"}}>
+                      🗺️ Search "{result?.category==='dry'?'Kabadiwala':'Recycling Center'}" directly on Google Maps →
                     </a>
                   </Card>
-                ))}
+                ):(
+                  centers.map((c,i)=>(
+                    <Card key={i} className="ww-card-hover" t={t} style={{padding:"15px",borderRadius:16,marginBottom:9,border:`1px solid ${t.blue}18`}}>
+                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:5}}>
+                        <div style={{fontFamily:"'Outfit',sans-serif",fontSize:14,fontWeight:700,color:t.text,flex:1,paddingRight:8}}>{c.name}</div>
+                        <span style={{fontSize:11,color:t.blue,fontWeight:700,background:isDark?"rgba(96,165,250,.15)":"rgba(37,99,235,.1)",padding:"3px 9px",borderRadius:20,fontFamily:"'Outfit',sans-serif",flexShrink:0}}>#{i+1}</span>
+                      </div>
+                      <div style={{fontSize:12,color:t.green,fontWeight:600,marginBottom:8,fontFamily:"'Outfit',sans-serif"}}>♻️ {c.type}</div>
+                      <div style={{display:"flex",flexWrap:"wrap",gap:8,marginBottom:c.tip?8:10}}>
+                        <span style={{fontSize:11,color:t.textMid,fontFamily:"'Outfit',sans-serif"}}>📌 {c.address}</span>
+                        <span style={{fontSize:11,color:t.blue,fontWeight:600,fontFamily:"'Outfit',sans-serif"}}>🚶 {c.distance}</span>
+                      </div>
+                      {c.tip&&<div style={{fontSize:11,color:t.textMid,fontStyle:"italic",marginBottom:10,padding:"7px 10px",background:t.leaf2,borderRadius:8,fontFamily:"'Outfit',sans-serif"}}>💡 {c.tip}</div>}
+                      <a href={`https://www.google.com/maps/search/${encodeURIComponent(c.mapsQuery||c.name)}`} target="_blank" rel="noopener noreferrer"
+                        style={{display:"inline-flex",alignItems:"center",gap:6,padding:"7px 13px",background:isDark?"rgba(96,165,250,.12)":"rgba(37,99,235,.1)",border:`1px solid ${t.blue}30`,borderRadius:10,color:t.blue,fontSize:12,fontWeight:700,textDecoration:"none",fontFamily:"'Outfit',sans-serif"}}>
+                        🗺️ Open in Maps →
+                      </a>
+                    </Card>
+                  ))
+                )}
               </div>
             )}
           </div>
