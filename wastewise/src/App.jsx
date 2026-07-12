@@ -497,7 +497,7 @@ function ScannerPage({user, onScanComplete, t, isDark}) {
     r.readAsDataURL(file);
   },[]);
 
-  // ── Central AI caller — hits our Netlify function which holds the API key ──
+  // ── Central AI caller — hits our Vercel serverless function which holds the API key ──
   const callAI = async (body) => {
     const res = await fetch("/api/ai", {
       method: "POST",

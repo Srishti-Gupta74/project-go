@@ -34,7 +34,7 @@ Project Go is an AI-powered waste classification agent. You photograph any piece
 
 ## 🤖 The AI Agent
 
-Project Go uses **Gemini 2.5 Flash** (via secure Vercel / Netlify serverless functions) with three specialized agent calls:
+Project Go uses **Gemini 2.5 Flash** (via secure Vercel serverless functions) with three specialized agent calls:
 
 | Agent Call | What It Does |
 |------------|--------------|
@@ -42,7 +42,7 @@ Project Go uses **Gemini 2.5 Flash** (via secure Vercel / Netlify serverless fun
 | `impact` | Calculates environmental impact — carbon %, energy, water, wildlife effect, fun facts |
 | `centers` | Finds 3 nearest real recycling centers using geolocation |
 
-The API key is **never exposed to the frontend** — all AI calls go through a Vercel / Netlify serverless function.
+The API key is **never exposed to the frontend** — all AI calls go through a Vercel serverless function.
 
 ---
 
@@ -52,9 +52,9 @@ The API key is **never exposed to the frontend** — all AI calls go through a V
 |-------|-----------|
 | Frontend | React (Hooks), Recharts, pure CSS |
 | AI | Gemini 2.5 Flash (Vision + Text) |
-| Backend | Vercel / Netlify Serverless Functions (Node.js) |
+| Backend | Vercel Serverless Functions (Node.js) |
 | Build | Vite |
-| Deployment | Vercel / Netlify (CI/CD via GitHub) |
+| Deployment | Vercel (CI/CD via GitHub) |
 | Geolocation | Browser Geolocation API + OpenStreetMap Nominatim |
 | Storage | localStorage (per-user, no backend needed) |
 | Fonts | Fraunces (serif) + Outfit (sans) via Google Fonts |
@@ -106,7 +106,7 @@ The API key is **never exposed to the frontend** — all AI calls go through a V
 
 ## 🚀 Live Demo
 
-**[goprakriti.netlify.app](https://goprakriti.netlify.app)**
+**Deployed on Vercel**
 
 ---
 
@@ -121,15 +121,15 @@ cd project-go/wastewise
 npm install
 
 # Set up environment
-# Create netlify/functions/.env or set in Netlify dashboard:
+# Create .env locally or add to Vercel Dashboard:
 # GEMINI_API_KEY=your_key_here
 
 # Run dev server
 npm run dev
 
-# For full AI features, run with Netlify CLI:
-npm install -g netlify-cli
-netlify dev
+# For full serverless API testing locally with Vercel CLI:
+npm i -g vercel
+vercel dev
 ```
 
 ---
@@ -138,16 +138,17 @@ netlify dev
 
 ```
 project-go/
-├── netlify.toml             # Netlify build + redirect config
+├── vercel.json              # Vercel build configuration
+├── api/
+│   └── ai.js                # Vercel Serverless AI proxy (Gemini)
 └── wastewise/
     ├── src/
     │   ├── App.jsx          # Entire React app
     │   ├── App.css          # Global styles & animations
     │   ├── main.jsx         # React entry point
     │   └── index.css        # Base CSS
-    ├── netlify/
-    │   └── functions/
-    │       └── ai.js        # Serverless AI proxy (Gemini)
+    ├── api/
+    │   └── ai.js            # Vercel Serverless Function (ESM route)
     ├── index.html           # HTML entry
     ├── package.json
     └── vite.config.js

@@ -1,4 +1,4 @@
-// Vercel API route ported from netlify/functions/ai.js
+// Vercel Serverless Function for AI (Gemini)
 const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent";
 
 const PROMPTS = {
