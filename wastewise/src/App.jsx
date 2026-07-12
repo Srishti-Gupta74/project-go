@@ -434,6 +434,7 @@ function ScannerPage({user, onScanComplete, t, isDark}) {
   const [centersLoading,setCentersLoading]=useState(false);
   const [centersError,setCentersError]=useState(null);
   const [userCity,setUserCity]=useState(null);
+  const [customCityInput,setCustomCityInput]=useState("");
   const [inputMode,setInputMode]=useState("upload");
   const [cameraError,setCameraError]=useState(null);
   const [facingMode,setFacingMode]=useState("environment");
@@ -539,24 +540,40 @@ function ScannerPage({user, onScanComplete, t, isDark}) {
     finally { setImpactLoading(false); }
   };
 
-  const findCenters=async(category,itemName)=>{
+  const findCenters=async(category,itemName,manualCity=null)=>{
     setCentersLoading(true);setCentersError(null);setCenters(null);
-    let city="India";
-    try {
-      const pos=await new Promise((res,rej)=>navigator.geolocation.getCurrentPosition(res,rej,{timeout:5000}));
-      const geo=await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${pos.coords.latitude}&lon=${pos.coords.longitude}&format=json`);
-      const d=await geo.json();
-      city=d.address?.city||d.address?.town||d.address?.state||"India";setUserCity(city);
-    } catch { setUserCity(null); }
+    let city = manualCity || (customCityInput.trim() ? customCityInput.trim() : null) || userCity || "India";
+    if (!manualCity && !customCityInput.trim() && !userCity) {
+      try {
+        const getPos = (opts) => new Promise((res,rej)=>navigator.geolocation.getCurrentPosition(res,rej,opts));
+        let pos;
+        try { pos = await getPos({timeout:8000,enableHighAccuracy:true}); }
+        catch { pos = await getPos({timeout:5000,enableHighAccuracy:false}); }
+        const geo = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${pos.coords.latitude}&lon=${pos.coords.longitude}&format=json`);
+        const d = await geo.json();
+        const addr = d?.address || {};
+        const area = addr.city || addr.town || addr.suburb || addr.district || addr.locality || addr.state_district || addr.county || addr.state || "India";
+        const stateStr = addr.state && addr.state !== area ? `, ${addr.state}` : "";
+        city = addr.city || addr.town || addr.suburb || addr.district ? `${area}${stateStr}` : area;
+        setUserCity(city);
+        setCustomCityInput(city);
+      } catch {
+        city = "India";
+        setUserCity("India");
+      }
+    } else if (manualCity) {
+      city = manualCity;
+      setUserCity(city);
+    }
     try {
       const data = await callAI({ type: "centers", category, itemName, city });
       if (!Array.isArray(data)) throw new Error();
       setCenters(data);
-    } catch { setCentersError("Couldn't find centers. Try Google Maps for recycling centers near you."); }
+    } catch { setCentersError("Couldn't find centers. Try typing your exact city below or use Google Maps."); }
     finally { setCentersLoading(false); }
   };
 
-  const reset=()=>{stopCamera();setInputMode("upload");setImage(null);setImgB64(null);setResult(null);setImpact(null);setError(null);setCenters(null);setCentersError(null);setUserCity(null);};
+  const reset=()=>{stopCamera();setInputMode("upload");setImage(null);setImgB64(null);setResult(null);setImpact(null);setError(null);setCenters(null);setCentersError(null);setUserCity(null);setCustomCityInput("");};
   const cat=result?CATS[result.category]:null;
   const catColor = cat ? (isDark ? cat.color : cat.darkColor) : t.green;
 
@@ -725,16 +742,52 @@ function ScannerPage({user, onScanComplete, t, isDark}) {
           {/* Centers */}
           <div style={{marginBottom:12}}>
             {!centers&&!centersLoading&&(
-              <button className="ww-btn-green" onClick={()=>findCenters(result.category,result.itemName)}
-                style={{width:"100%",padding:"14px",background:isDark?"rgba(96,165,250,.12)":"rgba(37,99,235,.08)",border:`1px solid ${t.blue}40`,borderRadius:16,cursor:"pointer",color:t.blue,fontSize:14,fontWeight:700,fontFamily:"'Outfit',sans-serif",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
-                📍 Find Nearest Recycling Centers
-              </button>
+              <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                <button className="ww-btn-green" onClick={()=>findCenters(result.category,result.itemName)}
+                  style={{width:"100%",padding:"14px",background:isDark?"rgba(96,165,250,.12)":"rgba(37,99,235,.08)",border:`1px solid ${t.blue}40`,borderRadius:16,cursor:"pointer",color:t.blue,fontSize:14,fontWeight:700,fontFamily:"'Outfit',sans-serif",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
+                  📍 Detect GPS Location & Find Centers
+                </button>
+                <div style={{display:"flex",gap:6,alignItems:"center"}}>
+                  <input value={customCityInput} onChange={e=>setCustomCityInput(e.target.value)} placeholder="or type city/area (e.g. Malviya Nagar, Jaipur)..."
+                    style={{flex:1,padding:"11px 13px",background:t.inputBg,border:`1px solid ${t.border}`,borderRadius:12,color:t.text,fontSize:13,fontFamily:"'Outfit',sans-serif",outline:"none"}}
+                    onKeyDown={e=>{if(e.key==="Enter"&&customCityInput.trim()) findCenters(result.category,result.itemName,customCityInput.trim());}} />
+                  <button onClick={()=>{if(customCityInput.trim()) findCenters(result.category,result.itemName,customCityInput.trim()); else findCenters(result.category,result.itemName);}}
+                    style={{padding:"11px 16px",background:t.blue,border:"none",borderRadius:12,color:"#fff",fontSize:13,fontWeight:700,fontFamily:"'Outfit',sans-serif",cursor:"pointer",display:"flex",alignItems:"center",gap:5}}>
+                    🔍 Search
+                  </button>
+                </div>
+              </div>
             )}
-            {centersLoading&&<Card t={t} style={{padding:"18px",borderRadius:16,display:"flex",alignItems:"center",justifyContent:"center",gap:10}}><Spinner color={t.blue} size={14}/><span style={{color:t.blue,fontSize:13,fontFamily:"'Outfit',sans-serif",fontWeight:600}}>{userCity?`Searching in ${userCity}...`:"Detecting your location..."}</span></Card>}
-            {centersError&&<Card t={t} style={{padding:"13px 15px",borderRadius:14,border:`1px solid ${t.red}25`}}><p style={{color:t.red,fontSize:13,margin:0,fontFamily:"'Outfit',sans-serif"}}>⚠️ {centersError}</p></Card>}
+            {centersLoading&&<Card t={t} style={{padding:"18px",borderRadius:16,display:"flex",alignItems:"center",justifyContent:"center",gap:10}}><Spinner color={t.blue} size={14}/><span style={{color:t.blue,fontSize:13,fontFamily:"'Outfit',sans-serif",fontWeight:600}}>{userCity&&userCity!=="India"?`Searching specifically in ${userCity}...`:"Detecting exact area & searching..."}</span></Card>}
+            {centersError&&(
+              <Card t={t} style={{padding:"13px 15px",borderRadius:14,border:`1px solid ${t.red}25`,marginBottom:8}}>
+                <p style={{color:t.red,fontSize:13,margin:"0 0 8px 0",fontFamily:"'Outfit',sans-serif"}}>⚠️ {centersError}</p>
+                <div style={{display:"flex",gap:6}}>
+                  <input value={customCityInput} onChange={e=>setCustomCityInput(e.target.value)} placeholder="Type city or area name..."
+                    style={{flex:1,padding:"9px 12px",background:t.inputBg,border:`1px solid ${t.border}`,borderRadius:10,color:t.text,fontSize:13,fontFamily:"'Outfit',sans-serif",outline:"none"}}
+                    onKeyDown={e=>{if(e.key==="Enter"&&customCityInput.trim()) findCenters(result.category,result.itemName,customCityInput.trim());}} />
+                  <button onClick={()=>{if(customCityInput.trim()) findCenters(result.category,result.itemName,customCityInput.trim());}}
+                    style={{padding:"9px 14px",background:t.blue,border:"none",borderRadius:10,color:"#fff",fontSize:13,fontWeight:700,fontFamily:"'Outfit',sans-serif",cursor:"pointer"}}>
+                    Search Area
+                  </button>
+                </div>
+              </Card>
+            )}
             {centers&&(
               <div style={{animation:"ww-slideup .4s ease"}}>
-                <div style={{fontSize:10,color:t.blue,letterSpacing:2,marginBottom:10,fontWeight:700,fontFamily:"'Outfit',sans-serif"}}>📍 CENTERS{userCity?` IN ${userCity.toUpperCase()}`:""}</div>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8,flexWrap:"wrap",gap:8}}>
+                  <div style={{fontSize:10,color:t.blue,letterSpacing:2,fontWeight:700,fontFamily:"'Outfit',sans-serif"}}>📍 CENTERS IN {(userCity||"YOUR AREA").toUpperCase()}</div>
+                  <span style={{fontSize:11,color:t.textDim,fontFamily:"'Outfit',sans-serif"}}>Not right? Type area below:</span>
+                </div>
+                <div style={{display:"flex",gap:6,marginBottom:12}}>
+                  <input value={customCityInput} onChange={e=>setCustomCityInput(e.target.value)} placeholder="e.g. Indiranagar, Bangalore or Andheri, Mumbai..."
+                    style={{flex:1,padding:"9px 12px",background:t.inputBg,border:`1px solid ${t.border}`,borderRadius:10,color:t.text,fontSize:12,fontFamily:"'Outfit',sans-serif",outline:"none"}}
+                    onKeyDown={e=>{if(e.key==="Enter"&&customCityInput.trim()) findCenters(result.category,result.itemName,customCityInput.trim());}} />
+                  <button onClick={()=>{if(customCityInput.trim()) findCenters(result.category,result.itemName,customCityInput.trim());}}
+                    style={{padding:"9px 14px",background:t.blue,border:"none",borderRadius:10,color:"#fff",fontSize:12,fontWeight:700,fontFamily:"'Outfit',sans-serif",cursor:"pointer",display:"flex",alignItems:"center",gap:4}}>
+                    🔍 Update Area
+                  </button>
+                </div>
                 {centers.map((c,i)=>(
                   <Card key={i} className="ww-card-hover" t={t} style={{padding:"15px",borderRadius:16,marginBottom:9,border:`1px solid ${t.blue}18`}}>
                     <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:5}}>
