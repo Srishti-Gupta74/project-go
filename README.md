@@ -2,7 +2,7 @@
 Project Go
 ### *Go Green. Go Clean. Go Smart.*
 
-> **AgentathonX 2026 — India's First Online Agentathon**  
+> **Project Go — India's waste-sorting assistant**  
 > Built solo by Srishti Suman Gupta, BTech CSE Year 1
 
 ---
@@ -166,7 +166,7 @@ SDG 1 · SDG 3 · SDG 6 · SDG 7 · SDG 8 · SDG 11 · **SDG 12** · **SDG 13** 
 ## 👩‍💻 About the Builder
 
 **Team Prakriti — Srishti Suman Gupta**  
-BTech CSE Year 1 · Solo participant · AgentathonX 2026  
+BTech CSE Year 1 · Solo participant
 
 ---
 
