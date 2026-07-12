@@ -2,7 +2,7 @@
 // This runs on Netlify's servers — your API key stays secret here.
 // The frontend calls /api/ai, Netlify routes it to this function.
 
-const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent";
+const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent";
 
 // ── Prompts ──────────────────────────────────────────────────────────────────
 const PROMPTS = {
@@ -146,8 +146,10 @@ export const handler = async (event) => {
     return { statusCode: 400, headers, body: JSON.stringify({ error: err.message }) };
   }
 
-  // Call Gemini
+  try {
+    // Disable thinking for gemini-2.5-flash to get clean JSON responses
     geminiBody.generationConfig = geminiBody.generationConfig || {};
+    geminiBody.generationConfig.thinkingConfig = { thinkingBudget: 0 };
 
     const geminiRes = await fetch(`${GEMINI_API_URL}?key=${apiKey}`, {
       method: "POST",
