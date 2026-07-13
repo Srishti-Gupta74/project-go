@@ -230,17 +230,22 @@ const GlobalStyles = () => (
 
     /* ── Auth page desktop ── */
     .ww-auth-wrap{
-      display:flex; align-items:center; justify-content:center;
-      min-height:100%; width:100%; padding:40px 24px;
+      display:flex; align-items:center; justify-content:center; flex-direction:column;
+      min-height:100%; width:100%; padding:24px 16px; gap:28px;
     }
     @media(min-width:900px){
-      .ww-auth-wrap{ gap:80px; }
+      .ww-auth-wrap{ flex-direction:row; padding:40px 24px; gap:80px; }
       .ww-auth-hero{ text-align:left!important; margin-bottom:0!important; flex:1; max-width:480px; }
       .ww-auth-hero h1{ font-size:4.5rem!important; }
       .ww-auth-hero p{ font-size:15px!important; }
       .ww-auth-taglines{ display:flex!important; }
       .ww-auth-form{ flex:0 0 420px; }
       .ww-auth-quote{ text-align:left!important; }
+    }
+    @media(max-width:899px){
+      .ww-auth-hero h1{ font-size:2.6rem!important; line-height:1.15!important; }
+      .ww-auth-hero p{ font-size:12px!important; }
+      .ww-auth-form{ width:100%!important; max-width:100%!important; }
     }
     .ww-auth-taglines{ display:none; flex-direction:column; gap:14px; margin-top:32px; }
     .ww-auth-tagline{
@@ -255,7 +260,7 @@ const GlobalStyles = () => (
     /* Navbar max-width */
     .ww-nav-inner{
       max-width:1200px; margin:0 auto; width:100%;
-      padding:12px 24px; display:flex; align-items:center; justify-content:space-between;
+      padding:12px 24px; display:flex; align-items:center; justify-content:space-between; gap:10px;
     }
     .ww-nav-tabs{
       max-width:1200px; margin:0 auto; width:100%;
@@ -273,7 +278,7 @@ const GlobalStyles = () => (
       flex:0 0 260px;
       position:sticky; top:90px;
     }
-    .ww-content{ flex:1; min-width:0; max-width:680px; }
+    .ww-content{ flex:1; min-width:0; max-width:680px; width:100%; }
     .ww-right-panel{ display:none; flex:0 0 300px; position:sticky; top:90px; }
 
     @media(min-width:900px){
@@ -284,6 +289,38 @@ const GlobalStyles = () => (
     @media(min-width:1100px){
       .ww-right-panel{ display:block!important; }
       .ww-content{ max-width:560px; }
+    }
+
+    /* Mobile Responsive Layout Master Rules */
+    @media(max-width:899px){
+      .ww-nav-inner{ padding:10px 14px!important; flex-wrap:wrap!important; gap:8px!important; }
+      .ww-nav-tabs{ padding:0 12px 10px!important; overflow-x:auto!important; -webkit-overflow-scrolling:touch; justify-content:flex-start!important; scrollbar-width:none; gap:6px!important; }
+      .ww-nav-tabs::-webkit-scrollbar{ display:none; }
+      .ww-nav-tabs button{ flex:0 0 auto!important; min-width:70px!important; padding:8px 12px!important; }
+      .ww-main-layout{ padding:14px 12px 80px!important; flex-direction:column!important; gap:16px!important; }
+      .ww-content{ width:100%!important; max-width:100%!important; }
+      
+      /* Stack 2 and 3 column inline grids on mobile screen */
+      .ww-grid-2-mobile-1,
+      [style*="grid-template-columns: 1fr 1fr"],
+      [style*="gridTemplateColumns: 1fr 1fr"],
+      [style*="grid-template-columns: \"1fr 1fr\""],
+      [style*="gridTemplateColumns: \"repeat(3,1fr)\""],
+      [style*="grid-template-columns: repeat(3, 1fr)"],
+      [style*="gridTemplateColumns: \"repeat(3, 1fr)\""],
+      [style*="gridTemplateColumns: \"1fr 1fr 1fr\""] {
+        grid-template-columns: 1fr!important;
+        gap: 10px!important;
+      }
+      
+      .ww-dash-tabs,
+      .ww-stats-grid,
+      [style*="gridTemplateColumns: \"repeat(4,1fr)\""],
+      [style*="grid-template-columns: repeat(4, 1fr)"],
+      [style*="gridTemplateColumns: \"repeat(4, 1fr)\""] {
+        grid-template-columns: 1fr 1fr!important;
+        gap: 8px!important;
+      }
     }
 
     /* Sidebar nav button */
@@ -311,8 +348,9 @@ const GlobalStyles = () => (
     }
 
     /* Stats grid bigger on desktop */
+    .ww-stats-grid{ display:grid; grid-template-columns:repeat(4,1fr); gap:6px; margin-bottom:18px; }
     @media(min-width:900px){
-      .ww-stats-grid{ grid-template-columns:repeat(4,1fr)!important; }
+      .ww-stats-grid{ grid-template-columns:repeat(4,1fr)!important; gap:12px!important; }
     }
 
     /* Auth taglines light mode */
