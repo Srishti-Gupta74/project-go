@@ -827,14 +827,22 @@ function ScannerPage({user, onScanComplete, t, isDark}) {
                   </button>
                 </div>
                 {centers.length===0?(
-                  <Card t={t} style={{padding:"18px",borderRadius:16,border:`1px solid ${t.blue}25`,textAlign:"center"}}>
-                    <p style={{fontSize:13,color:t.textMid,margin:"0 0 12px 0",fontFamily:"'Outfit',sans-serif",lineHeight:1.5}}>
-                      🛡️ We strictly avoid inventing store names. We couldn't verify a guaranteed real kabadiwala / recycling store directly inside <b>{userCity||"your area"}</b> or surrounding main city right now.
+                  <Card t={t} style={{padding:"20px",borderRadius:18,border:`1px solid ${t.blue}25`,textAlign:"center"}}>
+                    <div style={{fontSize:28,marginBottom:8}}>🛡️</div>
+                    <div style={{fontFamily:"'Fraunces',serif",fontSize:16,fontWeight:800,color:t.text,marginBottom:8}}>Strict Zero-Hallucination Active</div>
+                    <p style={{fontSize:13,color:t.textMid,margin:"0 0 16px 0",fontFamily:"'Outfit',sans-serif",lineHeight:1.6}}>
+                      To protect you from fake store names, the AI strictly lists only 100% verified businesses. We couldn't verify a guaranteed named kabadiwala specifically inside <b>{userCity||"your exact area"}</b> in our database right now.
                     </p>
-                    <a href={`https://www.google.com/maps/search/${encodeURIComponent((result?.category==='dry'?'kabadiwala scrap dealer ':'recycling center ')+(userCity||''))}`} target="_blank" rel="noopener noreferrer"
-                      style={{display:"inline-flex",alignItems:"center",gap:6,padding:"10px 16px",background:t.blue,borderRadius:12,color:"#fff",fontSize:13,fontWeight:700,textDecoration:"none",fontFamily:"'Outfit',sans-serif"}}>
-                      🗺️ Search "{result?.category==='dry'?'Kabadiwala':'Recycling Center'}" near {userCity||"you"} on Google Maps →
-                    </a>
+                    <div style={{display:"flex",flexDirection:"column",gap:8,alignItems:"center",maxWidth:400,margin:"0 auto"}}>
+                      <a href={`https://www.google.com/maps/search/${encodeURIComponent('kabadiwala scrap dealer near '+(userCity||''))}`} target="_blank" rel="noopener noreferrer"
+                        style={{width:"100%",display:"inline-flex",alignItems:"center",justifyContent:"center",gap:8,padding:"11px 16px",background:t.blue,borderRadius:12,color:"#fff",fontSize:13,fontWeight:700,textDecoration:"none",fontFamily:"'Outfit',sans-serif",boxShadow:`0 4px 12px ${t.blue}30`}}>
+                        🗺️ Search Live "Kabadiwala" near {(userCity||"You").split(',')[0]} →
+                      </a>
+                      <a href={`https://www.google.com/maps/search/${encodeURIComponent('recycling center near '+(userCity||''))}`} target="_blank" rel="noopener noreferrer"
+                        style={{width:"100%",display:"inline-flex",alignItems:"center",justifyContent:"center",gap:8,padding:"11px 16px",background:isDark?"rgba(96,165,250,.12)":"rgba(37,99,235,.1)",border:`1px solid ${t.blue}30`,borderRadius:12,color:t.blue,fontSize:13,fontWeight:700,textDecoration:"none",fontFamily:"'Outfit',sans-serif"}}>
+                        ♻️ Search Live "Recycling Centers" near {(userCity||"You").split(',')[0]} →
+                      </a>
+                    </div>
                   </Card>
                 ):(
                   centers.map((c,i)=>(
@@ -849,10 +857,16 @@ function ScannerPage({user, onScanComplete, t, isDark}) {
                         <span style={{fontSize:11,color:t.blue,fontWeight:600,fontFamily:"'Outfit',sans-serif"}}>🚶 {c.distance}</span>
                       </div>
                       {c.tip&&<div style={{fontSize:11,color:t.textMid,fontStyle:"italic",marginBottom:10,padding:"7px 10px",background:t.leaf2,borderRadius:8,fontFamily:"'Outfit',sans-serif"}}>💡 {c.tip}</div>}
-                      <a href={`https://www.google.com/maps/search/${encodeURIComponent(c.mapsQuery||c.name)}`} target="_blank" rel="noopener noreferrer"
-                        style={{display:"inline-flex",alignItems:"center",gap:6,padding:"7px 13px",background:isDark?"rgba(96,165,250,.12)":"rgba(37,99,235,.1)",border:`1px solid ${t.blue}30`,borderRadius:10,color:t.blue,fontSize:12,fontWeight:700,textDecoration:"none",fontFamily:"'Outfit',sans-serif"}}>
-                        🗺️ Open in Maps →
-                      </a>
+                      <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
+                        <a href={`https://www.google.com/maps/search/${encodeURIComponent(c.mapsQuery||c.name)}`} target="_blank" rel="noopener noreferrer"
+                          style={{display:"inline-flex",alignItems:"center",gap:6,padding:"7px 13px",background:isDark?"rgba(96,165,250,.12)":"rgba(37,99,235,.1)",border:`1px solid ${t.blue}30`,borderRadius:10,color:t.blue,fontSize:12,fontWeight:700,textDecoration:"none",fontFamily:"'Outfit',sans-serif"}}>
+                          🗺️ Open "{c.name}" on Maps →
+                        </a>
+                        <a href={`https://www.google.com/maps/search/${encodeURIComponent('kabadiwala scrap dealer near ' + (userCity||''))}`} target="_blank" rel="noopener noreferrer"
+                          style={{display:"inline-flex",alignItems:"center",gap:6,padding:"7px 13px",background:"transparent",border:`1px solid ${t.border}`,borderRadius:10,color:t.textMid,fontSize:12,fontWeight:600,textDecoration:"none",fontFamily:"'Outfit',sans-serif"}}>
+                          📍 See all local stores in {(userCity||"area").split(',')[0]} →
+                        </a>
+                      </div>
                     </Card>
                   ))
                 )}
