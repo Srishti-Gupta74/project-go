@@ -1,5 +1,16 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line, CartesianGrid } from "recharts";
+import {
+  supabase,
+  isSupabaseConfigured,
+  supabaseSignUp,
+  supabaseSignIn,
+  supabaseSignOut,
+  fetchUserData,
+  syncScanToSupabase,
+  syncSpendToSupabase,
+  syncEarningToSupabase
+} from "./supabase";
 
 // ─── Animated Go Logo ─────────────────────────────────────────────────────────
 const GO_TAGLINES = ["Go Green", "Go Clean", "Go Smart", "Go Local", "Go Zero", "Go Earth"];
@@ -126,24 +137,6 @@ const DAYS   = ["Su","Mo","Tu","We","Th","Fr","Sa"];
 const ls = {
   get:(k,d)=>{ try{const v=localStorage.getItem(k); return v?JSON.parse(v):d;}catch{return d;} },
   set:(k,v)=>{ try{localStorage.setItem(k,JSON.stringify(v));}catch{} }
-};
-
-const seedDemo = (username) => {
-  const base=Date.now(), DAY=86400000;
-  const items=[
-    {itemName:"Plastic Bottle",  category:"dry",       carbonPercent:73, points:15, date:new Date(base-6*DAY).toISOString()},
-    {itemName:"Banana Peel",     category:"wet",       carbonPercent:40, points:10, date:new Date(base-5*DAY).toISOString()},
-    {itemName:"Old Smartphone",  category:"ewaste",    carbonPercent:85, points:30, date:new Date(base-4*DAY).toISOString()},
-    {itemName:"Newspaper",       category:"dry",       carbonPercent:55, points:15, date:new Date(base-4*DAY).toISOString()},
-    {itemName:"Battery",         category:"hazardous", carbonPercent:90, points:25, date:new Date(base-3*DAY).toISOString()},
-    {itemName:"Food Scraps",     category:"wet",       carbonPercent:35, points:10, date:new Date(base-2*DAY).toISOString()},
-    {itemName:"Cardboard Box",   category:"dry",       carbonPercent:60, points:15, date:new Date(base-1*DAY).toISOString()},
-    {itemName:"Glass Bottle",    category:"dry",       carbonPercent:68, points:15, date:new Date(base).toISOString()},
-  ];
-  ls.set(`ww_history_${username}`,items);
-  ls.set(`ww_pts_${username}`,items.reduce((s,i)=>s+i.points,0));
-  ls.set(`ww_scans_${username}`,items.length);
-  ls.set(`ww_badges_${username}`,["first","eco5","pts50"]);
 };
 
 // ─── Animated leaf SVG ───────────────────────────────────────────────────────
@@ -370,22 +363,56 @@ function AuthPage({onLogin, isDark, toggleDark}) {
   const [err,setErr]=useState("");
   const [loading,setLoading]=useState(false);
 
+  const [info,setInfo]=useState("");
+
   const submit = async () => {
-    setErr(""); setLoading(true);
-    await new Promise(r=>setTimeout(r,700));
-    if(!email||!pass){setErr("Please fill all fields.");setLoading(false);return;}
+    setErr(""); setInfo(""); setLoading(true);
+    if(!email.trim()||!pass){setErr("Please fill all fields.");setLoading(false);return;}
     const u=email.toLowerCase().trim();
     if(mode==="signup"){
       if(!name.trim()){setErr("Enter your name.");setLoading(false);return;}
       if(pass.length<6){setErr("Password must be 6+ characters.");setLoading(false);return;}
-      if(ls.get(`ww_user_${u}`,null)){setErr("Account already exists. Please sign in.");setLoading(false);return;}
-      ls.set(`ww_user_${u}`,{name:name.trim(),email:u,joined:new Date().toISOString()});
-      seedDemo(u);
-      onLogin({name:name.trim(),email:u});
+      try {
+        if(isSupabaseConfigured) {
+          const res = await supabaseSignUp(u, pass, name.trim());
+          if (res?.user && !res?.session) {
+            setInfo("Account created! Please check your email to confirm your account, then sign in.");
+            setLoading(false);
+            return;
+          }
+          const userObj = {
+            id: res?.user?.id || `user_${Date.now()}`,
+            name: name.trim(),
+            email: u,
+          };
+          onLogin(userObj);
+        } else {
+          if(ls.get(`ww_user_${u}`,null)){setErr("Account already exists. Please sign in.");setLoading(false);return;}
+          const userObj = { id:`local_${Date.now()}`, name:name.trim(), email:u, joined:new Date().toISOString() };
+          ls.set(`ww_user_${u}`, userObj);
+          onLogin(userObj);
+        }
+      } catch(e) {
+        setErr(e.message || "Failed to sign up.");
+      }
     } else {
-      const user=ls.get(`ww_user_${u}`,null);
-      if(!user){setErr("Account not found. Create one first.");setLoading(false);return;}
-      onLogin(user);
+      try {
+        if(isSupabaseConfigured) {
+          const res = await supabaseSignIn(u, pass);
+          const userObj = {
+            id: res?.user?.id,
+            name: res?.user?.user_metadata?.name || res?.user?.email?.split("@")[0] || "EcoWarrior",
+            email: res?.user?.email || u,
+          };
+          onLogin(userObj);
+        } else {
+          const user=ls.get(`ww_user_${u}`,null);
+          if(!user){setErr("Account not found. Create one first or configure Supabase.");setLoading(false);return;}
+          onLogin(user);
+        }
+      } catch(e) {
+        setErr(e.message || "Invalid email or password.");
+      }
     }
     setLoading(false);
   };
@@ -446,9 +473,16 @@ function AuthPage({onLogin, isDark, toggleDark}) {
               <input value={pass} onChange={e=>setPass(e.target.value)} placeholder="••••••••" type="password" onKeyDown={e=>e.key==="Enter"&&submit()} style={{width:"100%",padding:"13px 16px",background:isDark?"rgba(0,0,0,.5)":"rgba(255,255,255,.9)",border:`1.5px solid ${t.border}`,borderRadius:12,color:t.text,fontSize:14,fontFamily:"'Outfit',sans-serif"}}/>
             </div>
             {err&&<div style={{padding:"11px 14px",background:isDark?"rgba(248,113,113,.1)":"rgba(220,38,38,.08)",border:"1px solid rgba(248,113,113,.3)",borderRadius:10,color:t.red,fontSize:13,fontFamily:"'Outfit',sans-serif"}}>⚠️ {err}</div>}
+            {info&&<div style={{padding:"11px 14px",background:isDark?"rgba(74,222,128,.12)":"rgba(22,163,74,.1)",border:"1px solid rgba(74,222,128,.3)",borderRadius:10,color:t.green,fontSize:13,fontFamily:"'Outfit',sans-serif"}}>✉️ {info}</div>}
             <button className="ww-btn-green" onClick={submit} disabled={loading} style={{padding:"15px",background:loading?t.bgCard:`linear-gradient(135deg,${t.greenDeep},${t.green})`,border:`1px solid ${t.borderGreen}`,borderRadius:14,cursor:loading?"not-allowed":"pointer",color:loading?t.textMid:isDark?"#030a03":"#fff",fontSize:15,fontWeight:700,fontFamily:"'Outfit',sans-serif",display:"flex",alignItems:"center",justifyContent:"center",gap:8,marginTop:4}}>
               {loading?<><Spinner color={t.green}/>Processing...</>:mode==="login"?"🌱 Welcome Back":"🚀 Join the Movement"}
             </button>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:6,marginTop:6}}>
+              <span style={{width:7,height:7,borderRadius:"50%",background:isSupabaseConfigured?"#22c55e":"#f59e0b",display:"inline-block"}}/>
+              <span style={{fontSize:11,color:t.textDim,fontFamily:"'Outfit',sans-serif"}}>
+                {isSupabaseConfigured ? "Supabase Cloud Auth Active" : "Local mode (add Supabase credentials in .env)"}
+              </span>
+            </div>
           </div>
         </Card>
       </div>
@@ -1208,6 +1242,15 @@ function EarningsPage({user, t, isDark}) {
     };
     const newLogs=[...logs, entry];
     setLogs(newLogs); ls.set(`ww_earn_${user.email}`,newLogs);
+    if(isSupabaseConfigured && user?.id) {
+      syncEarningToSupabase(user.id, {
+        date: entry.date,
+        buyer: entry.note || "Local Kabadiwala",
+        totalKg: entry.qty,
+        totalEarned: entry.earned,
+        items: [entry],
+      });
+    }
     setShowForm(false); setQty(1); setEarned(""); setNote("");
     setSaved(true); setTimeout(()=>setSaved(false),2500);
   };
@@ -1525,7 +1568,7 @@ function RewardsPage({user, t, isDark, totalPts, onSpend}) {
     const newRedeemed = [...redeemed, {id:reward.id, date:new Date().toISOString(), title:reward.title}];
     setRedeemed(newRedeemed);
     ls.set(`ww_redeemed_${user.email}`, newRedeemed);
-    onSpend(reward.cost);
+    onSpend(reward.cost, reward.id);
     setRedeeming(null);
     setSuccess(reward);
     setTimeout(()=>setSuccess(null), 4000);
@@ -1688,37 +1731,116 @@ export default function App() {
 
 
 
-  const handleLogin=(u)=>{ ls.set("ww_currentUser",u); setUser(u); setTotalPts(ls.get(`ww_pts_${u.email}`,0)); };
-  const handleLogout=()=>{ ls.set("ww_currentUser",null); setUser(null); setPage("scan"); setShowSignOut(false); };
+  // Auto-restore Supabase session on app launch
+  useEffect(() => {
+    if (!isSupabaseConfigured || !supabase) return;
 
-  const handleSpend=useCallback((cost)=>{
-    if(!user) return;
-    const newPts=Math.max(0,ls.get(`ww_pts_${user.email}`,0)-cost);
-    ls.set(`ww_pts_${user.email}`,newPts);
-    setTotalPts(newPts);
-  },[user]);
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        const u = {
+          id: session.user.id,
+          email: session.user.email,
+          name: session.user.user_metadata?.name || session.user.email.split("@")[0],
+        };
+        setUser(u);
+        ls.set("ww_currentUser", u);
+      }
+    });
 
-  const handleScanComplete=useCallback((scanData)=>{
-    if(!user) return;
-    const history=ls.get(`ww_history_${user.email}`,[]);
-    history.push(scanData);
-    ls.set(`ww_history_${user.email}`,history);
-    const pts=ls.get(`ww_pts_${user.email}`,0)+scanData.points;
-    const scans=ls.get(`ww_scans_${user.email}`,0)+1;
-    ls.set(`ww_pts_${user.email}`,pts);
-    ls.set(`ww_scans_${user.email}`,scans);
-    setTotalPts(pts);
-    const badges=ls.get(`ww_badges_${user.email}`,[]);
-    let unlocked=null;
-    for(const b of BADGES){
-      if(badges.includes(b.id)) continue;
-      if(b.type==="points"&&pts>=b.req){badges.push(b.id);unlocked=b;break;}
-      if(!b.type&&!b.cat&&scans>=b.req){badges.push(b.id);unlocked=b;break;}
-      if(b.cat&&b.cat===scanData.category){badges.push(b.id);unlocked=b;break;}
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        const u = {
+          id: session.user.id,
+          email: session.user.email,
+          name: session.user.user_metadata?.name || session.user.email.split("@")[0],
+        };
+        setUser(u);
+        ls.set("ww_currentUser", u);
+      } else if (_event === "SIGNED_OUT") {
+        setUser(null);
+        ls.set("ww_currentUser", null);
+      }
+    });
+
+    return () => subscription?.unsubscribe();
+  }, []);
+
+  // Fetch real profile & stats from Supabase on login (no hardcoded data)
+  useEffect(() => {
+    if (!user) {
+      setTotalPts(0);
+      return;
     }
-    ls.set(`ww_badges_${user.email}`,badges);
-    if(unlocked){setNewBadge(unlocked);setTimeout(()=>setNewBadge(null),4500);}
-  },[user]);
+    const loadUserData = async () => {
+      if (isSupabaseConfigured && user.id) {
+        const data = await fetchUserData(user.id, user.email);
+        setTotalPts(data.ecoCoins);
+        ls.set(`ww_pts_${user.email}`, data.ecoCoins);
+        ls.set(`ww_scans_${user.email}`, data.scanCount);
+        ls.set(`ww_badges_${user.email}`, data.badges);
+        if (data.history?.length) ls.set(`ww_history_${user.email}`, data.history);
+        if (data.earnings?.length) ls.set(`ww_earn_${user.email}`, data.earnings);
+        if (data.redeemed?.length) ls.set(`ww_redeemed_${user.email}`, data.redeemed);
+      } else {
+        setTotalPts(ls.get(`ww_pts_${user.email}`, 0));
+      }
+    };
+    loadUserData();
+  }, [user?.email, user?.id]);
+
+  const handleLogin = (u) => {
+    ls.set("ww_currentUser", u);
+    setUser(u);
+    setTotalPts(ls.get(`ww_pts_${u.email}`, 0));
+  };
+
+  const handleLogout = async () => {
+    if (isSupabaseConfigured) {
+      await supabaseSignOut();
+    }
+    ls.set("ww_currentUser", null);
+    setUser(null);
+    setTotalPts(0);
+    setPage("scan");
+    setShowSignOut(false);
+  };
+
+  const handleSpend = useCallback((cost, rewardId) => {
+    if (!user) return;
+    const newPts = Math.max(0, (ls.get(`ww_pts_${user.email}`, 0) || 0) - cost);
+    ls.set(`ww_pts_${user.email}`, newPts);
+    setTotalPts(newPts);
+    if (isSupabaseConfigured && user.id) {
+      syncSpendToSupabase(user.id, newPts, rewardId, cost);
+    }
+  }, [user]);
+
+  const handleScanComplete = useCallback((scanData) => {
+    if (!user) return;
+    const history = ls.get(`ww_history_${user.email}`, []);
+    history.push(scanData);
+    ls.set(`ww_history_${user.email}`, history);
+    const pts = (ls.get(`ww_pts_${user.email}`, 0) || 0) + (scanData.points || 10);
+    const scans = (ls.get(`ww_scans_${user.email}`, 0) || 0) + 1;
+    ls.set(`ww_pts_${user.email}`, pts);
+    ls.set(`ww_scans_${user.email}`, scans);
+    setTotalPts(pts);
+
+    const badges = ls.get(`ww_badges_${user.email}`, []);
+    let unlocked = null;
+    for (const b of BADGES) {
+      if (badges.includes(b.id)) continue;
+      if (b.type === "points" && pts >= b.req) { badges.push(b.id); unlocked = b; break; }
+      if (!b.type && !b.cat && scans >= b.req) { badges.push(b.id); unlocked = b; break; }
+      if (b.cat && b.cat === scanData.category) { badges.push(b.id); unlocked = b; break; }
+    }
+    ls.set(`ww_badges_${user.email}`, badges);
+    if (unlocked) { setNewBadge(unlocked); setTimeout(() => setNewBadge(null), 4500); }
+
+    if (isSupabaseConfigured && user.id) {
+      syncScanToSupabase(user.id, scanData, pts, scans, badges);
+    }
+  }, [user]);
 
   if(!user) return <AuthPage onLogin={handleLogin} isDark={isDark} toggleDark={toggleDark}/>;
 
