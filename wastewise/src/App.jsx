@@ -2536,7 +2536,6 @@ export default function App() {
             <button key={pg.id} onClick={()=>setPage(pg.id)} style={{flex:1,padding:"8px 3px",borderRadius:11,border:"none",cursor:"pointer",fontFamily:"'Outfit',sans-serif",fontSize:11,fontWeight:700,transition:"all .2s",background:page===pg.id?`linear-gradient(135deg,${t.greenDeep},${t.green})`:"transparent",color:page===pg.id?isDark?"#030a03":"#fff":t.textMid,position:"relative"}}>
               <div style={{fontSize:15,marginBottom:1}}>{pg.icon}</div>
               <div>{pg.label}</div>
-              {pg.id==="rewards"&&totalPts>=15&&page!=="rewards"&&<div style={{position:"absolute",top:3,right:3,width:7,height:7,borderRadius:"50%",background:isDark?"#fbbf24":"#d97706"}}/>}
             </button>
           ))}
         </div>
@@ -2556,7 +2555,6 @@ export default function App() {
                 <div style={{fontSize:14,fontWeight:700,fontFamily:"'Outfit',sans-serif",color:page===pg.id?t.green:t.text}}>{pg.label}</div>
                 <div style={{fontSize:11,color:t.textDim,fontFamily:"'Outfit',sans-serif"}}>{pg.desc}</div>
               </div>
-              {pg.id==="rewards"&&totalPts>=15&&page!=="rewards"&&<div style={{width:8,height:8,borderRadius:"50%",background:isDark?"#fbbf24":"#d97706",flexShrink:0}}/>}
             </button>
           ))}
 
