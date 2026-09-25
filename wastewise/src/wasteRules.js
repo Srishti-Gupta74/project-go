@@ -500,7 +500,10 @@ export function validateWasteClassification(rawResult, userConditionOverride = n
 
   const impactStatText = rawResult.impactStat || "Segregating waste at source diverts up to 80% of waste away from open dumps.";
 
+  const box = parseBoundingBox(rawResult.boundingBox || rawResult.box_2d || rawResult.box);
+
   return {
+    id: rawResult.id || "item-1",
     object: objectName,
     itemName: objectName, // Backwards-compatible
     material: material,
@@ -519,6 +522,138 @@ export function validateWasteClassification(rawResult, userConditionOverride = n
     recyclable: Boolean(rawResult.recyclable ?? (category === "RECYCLABLE" || category === "DRY_WASTE")),
     decompositionDays: rawResult.decompositionDays ?? null,
     impactStat: impactStatText,
+    boundingBox: box,
     stream: stream,
+  };
+}
+
+/**
+ * Normalizes, validates, and converts Gemini bounding boxes into percentages.
+ * 
+ * Supports both [ymin, xmin, ymax, xmax] arrays and {ymin, xmin, ymax, xmax} objects.
+ * Handles both 0..1000 normalized integers and 0..1 floats.
+ * 
+ * @param {Array|Object|null} rawBox
+ * @returns {Object|null} Validated bounding box with percentage positions, or null if invalid
+ */
+export function parseBoundingBox(rawBox) {
+  if (!rawBox) return null;
+
+  let ymin, xmin, ymax, xmax;
+
+  if (Array.isArray(rawBox) && rawBox.length >= 4) {
+    [ymin, xmin, ymax, xmax] = rawBox;
+  } else if (typeof rawBox === "object") {
+    ymin = rawBox.ymin ?? rawBox.top ?? rawBox.y1 ?? rawBox[0];
+    xmin = rawBox.xmin ?? rawBox.left ?? rawBox.x1 ?? rawBox[1];
+    ymax = rawBox.ymax ?? rawBox.bottom ?? rawBox.y2 ?? rawBox[2];
+    xmax = rawBox.xmax ?? rawBox.right ?? rawBox.x2 ?? rawBox[3];
+  } else {
+    return null;
+  }
+
+  ymin = Number(ymin);
+  xmin = Number(xmin);
+  ymax = Number(ymax);
+  xmax = Number(xmax);
+
+  if (isNaN(ymin) || isNaN(xmin) || isNaN(ymax) || isNaN(xmax)) {
+    return null;
+  }
+
+  // Handle 0..1 floating point coordinates by scaling to 0..1000
+  if (ymax <= 1.05 && xmax <= 1.05 && (ymax > 0 || xmax > 0)) {
+    ymin = Math.round(ymin * 1000);
+    xmin = Math.round(xmin * 1000);
+    ymax = Math.round(ymax * 1000);
+    xmax = Math.round(xmax * 1000);
+  }
+
+  // Clamp within 0..1000 range
+  ymin = Math.max(0, Math.min(1000, ymin));
+  xmin = Math.max(0, Math.min(1000, xmin));
+  ymax = Math.max(0, Math.min(1000, ymax));
+  xmax = Math.max(0, Math.min(1000, xmax));
+
+  // Validation: xmin < xmax and ymin < ymax
+  if (xmin >= xmax || ymin >= ymax) {
+    return null;
+  }
+
+  return {
+    ymin,
+    xmin,
+    ymax,
+    xmax,
+    topPct: ymin / 10,
+    leftPct: xmin / 10,
+    widthPct: (xmax - xmin) / 10,
+    heightPct: (ymax - ymin) / 10,
+  };
+}
+
+/**
+ * Validates an entire multi-object scan response through the deterministic rule engine.
+ * Computes dynamic category summary counts and ensures safe routing for every detected item.
+ * 
+ * @param {Object|Array} rawResponse - Response from Gemini (object with `items` array, array of items, or single item)
+ * @param {Object} [conditionOverrides={}] - Map of item ID -> condition override ("usable" | "damaged" | "unknown")
+ * @returns {Object} { items: Array, summary: Array<{ label: string, count: number, color: string }>, count: number }
+ */
+export function validateMultiObjectScan(rawResponse, conditionOverrides = {}) {
+  let rawList = [];
+
+  if (Array.isArray(rawResponse)) {
+    rawList = rawResponse;
+  } else if (rawResponse && Array.isArray(rawResponse.items)) {
+    rawList = rawResponse.items;
+  } else if (rawResponse && typeof rawResponse === "object") {
+    // Check if this is a single item (legacy format or single detection)
+    if (rawResponse.object || rawResponse.itemName || rawResponse.category) {
+      rawList = [rawResponse];
+    }
+  }
+
+  // Deduplicate and index multiple instances if needed
+  const nameCounts = {};
+  const validatedItems = rawList.map((rawItem, idx) => {
+    const rawName = (rawItem.object || rawItem.itemName || `Item ${idx + 1}`).trim();
+    nameCounts[rawName] = (nameCounts[rawName] || 0) + 1;
+
+    const id = rawItem.id || `item-${idx + 1}`;
+    const override = conditionOverrides[id] || null;
+    const validated = validateWasteClassification(rawItem, override);
+    const box = parseBoundingBox(rawItem.boundingBox || rawItem.box_2d || rawItem.box);
+
+    return {
+      ...validated,
+      id,
+      boundingBox: box,
+    };
+  });
+
+  // Calculate dynamic category summary
+  const catCountMap = {};
+  for (const item of validatedItems) {
+    const stream = WASTE_STREAMS[item.category] || WASTE_STREAMS.UNKNOWN;
+    const label = stream.shortLabel || stream.label || item.category;
+    if (!catCountMap[label]) {
+      catCountMap[label] = {
+        label,
+        count: 0,
+        color: stream.color,
+        darkColor: stream.darkColor,
+        emoji: stream.emoji,
+      };
+    }
+    catCountMap[label].count += 1;
+  }
+
+  const summary = Object.values(catCountMap);
+
+  return {
+    items: validatedItems,
+    summary,
+    count: validatedItems.length,
   };
 }

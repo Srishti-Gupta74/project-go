@@ -1,4 +1,3 @@
-// Vercel Serverless Function for AI (Gemini)
 const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent";
 
 const PROMPTS = {
@@ -12,65 +11,65 @@ const PROMPTS = {
           }
         },
         {
-          text: `You are an AI waste-management and circular-economy classification assistant.
-Analyze this uploaded image carefully.
+          text: `You are an AI waste-management and circular-economy multi-object detection assistant.
+Analyze this uploaded image and detect ALL relevant objects for waste segregation, reuse, donation, recycling, or special disposal.
 
-IMPORTANT RULES:
-1. Do NOT assume that every visible object is waste. A reusable or normal functional object is NOT automatically waste.
-2. First identify the primary object and its material composition.
-3. Determine whether the object appears to be:
-   - A normal item that is likely still in use / reusable
-   - An unwanted but potentially reusable item
-   - Actual waste
-   - A large/bulky item requiring a different disposal route
-   - A special-care item
-   - Uncertain
-4. Prioritize REUSE and DONATION when an item appears usable.
-5. Large furniture and bulky objects (beds, mattresses, sofas, couches, wardrobes, large tables, large chairs, carpets, large appliances) must NEVER be classified as ordinary household-bin waste. For usable furniture, recommend REUSE / DONATE. If damaged or unwanted, recommend BULKY_WASTE collection.
-6. The model must distinguish:
-   - object / itemName: specific name of the object
-   - material: main material(s)
-   - isWaste: boolean (false if usable or still in service)
-   - condition: "usable" | "damaged" | "unknown"
-   - conditionConfidence: number between 0.0 and 1.0
-   - category: "WET_WASTE" | "DRY_WASTE" | "SANITARY_WASTE" | "SPECIAL_CARE_WASTE" | "BULKY_WASTE" | "E_WASTE" | "TEXTILE" | "RECYCLABLE" | "COMPOSTABLE" | "REUSABLE" | "GENERAL_WASTE" | "UNKNOWN"
-   - action: "REUSE" | "DONATE" | "RECYCLE" | "COMPOST" | "SPECIAL_DISPOSAL" | "BULKY_WASTE" | "GENERAL_DISPOSAL" | "UNKNOWN"
-   - disposalRoute: clear route description (e.g. "Donate to charity or resell if usable; otherwise schedule bulky waste pickup")
-   - bin: null (never recommend an unverified household bin for bulky furniture, e-waste, or batteries)
-   - confidence: number between 0.0 and 1.0
-   - reason: concise explanation of why this category and action were chosen
-   - userConfirmationRequired: boolean (true if condition is ambiguous or confirmation needed)
-   - disposal: practical disposal or reuse guidance in India
-   - tip: practical eco-tip or circularity suggestion
-   - recyclable: boolean
-   - decompositionDays: number of days or null
-   - impactStat: one shocking or inspiring statistic about this item/material in India
+CRITICAL DETECTION RULES:
+1. ONLY detect items relevant to waste, recycling, reuse, donation, or special disposal.
+2. DO NOT detect background room architecture or structural surfaces:
+   - NEVER detect walls, doors, windows, ceilings, flooring, tiles, light fixtures, curtains.
+3. Detect:
+   - Recyclable containers (plastic bottles, glass bottles, aluminum cans, paper, cardboard)
+   - Reusable / Donatable furniture (beds, mattresses, sofas, desks, tables, chairs, wardrobes)
+   - Electronics & E-waste (phones, chargers, cables, laptops, gadgets)
+   - Batteries & Special care items (medicines, paint, chemicals)
+   - Organic & wet waste (food leftovers, peels, compostables)
+   - Textiles & garments (clothes, bags, shoes)
+   - General discards & residual packaging
+4. For MULTIPLE instances (e.g. 2 bottles or 3 beds), detect EACH instance separately with its own ID (e.g. "item-1", "item-2") and label (e.g. "Bed #1", "Bed #2", "Plastic Bottle #1").
+5. Normalized Bounding Box coordinates MUST be integers between 0 and 1000:
+   - ymin: top boundary (0 to 1000)
+   - xmin: left boundary (0 to 1000)
+   - ymax: bottom boundary (0 to 1000)
+   - xmax: right boundary (0 to 1000)
+6. Apply Circular Economy hierarchy:
+   REUSE / DONATE (if usable) -> RECYCLE -> SPECIAL DISPOSAL -> BULKY WASTE -> GENERAL DISPOSAL.
+   Bulky furniture must NEVER be classified as ordinary household dry waste or household bins (bin must be null).
 
-Respond ONLY with a valid JSON object matching these exact keys — no markdown, no backticks, no text outside JSON:
+Respond ONLY with a valid JSON object matching this schema:
 {
-  "object": "name of object",
-  "itemName": "name of object",
-  "material": "materials",
-  "isWaste": false,
-  "condition": "usable",
-  "conditionConfidence": 0.85,
-  "category": "REUSABLE",
-  "action": "REUSE",
-  "disposalRoute": "Donate or resell",
-  "bin": null,
-  "confidence": 0.94,
-  "reason": "This is a furniture item rather than household waste.",
-  "userConfirmationRequired": false,
-  "disposal": "Keep in circular use through donation.",
-  "tip": "Clean and photograph for local community sharing.",
-  "recyclable": true,
-  "decompositionDays": null,
-  "impactStat": "Extending furniture life prevents massive landfill volume."
-}`
+  "items": [
+    {
+      "id": "item-1",
+      "object": "Bed #1",
+      "material": "Wood / Foam / Fabric",
+      "isWaste": false,
+      "condition": "usable",
+      "conditionConfidence": 0.85,
+      "category": "REUSABLE",
+      "action": "REUSE",
+      "disposalRoute": "Donate or resell",
+      "bin": null,
+      "confidence": 0.92,
+      "reason": "Functional furniture in usable condition should be reused or donated.",
+      "userConfirmationRequired": false,
+      "disposal": "Offer to local charities or secondhand platforms.",
+      "tip": "Extending furniture life avoids bulky landfill burden.",
+      "recyclable": true,
+      "boundingBox": {
+        "ymin": 380,
+        "xmin": 510,
+        "ymax": 640,
+        "xmax": 660
+      }
+    }
+  ]
+}
+If no relevant waste or reusable objects are found, return: { "items": [] }`
         }
       ]
     }],
-    generationConfig: { responseMimeType: "application/json", maxOutputTokens: 900 }
+    generationConfig: { responseMimeType: "application/json", maxOutputTokens: 4096 }
   }),
 
   impact: (itemName, category) => ({
@@ -144,44 +143,43 @@ Respond ONLY with a valid JSON array of 3 objects — no markdown formatting, no
 };
 
 export default async function handler(req, res) {
-  // CORS headers
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-  res.setHeader('Content-Type', 'application/json');
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  res.setHeader("Content-Type", "application/json");
 
-  if (req.method === 'OPTIONS') {
+  if (req.method === "OPTIONS") {
     return res.status(200).end();
   }
 
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
+  if (req.method !== "POST") {
+    return res.status(405).json({ error: "Method not allowed" });
   }
 
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
-    return res.status(500).json({ error: 'API key not configured. Add GEMINI_API_KEY to Vercel environment variables.' });
+    return res.status(500).json({ error: "API key not configured. Add GEMINI_API_KEY to Vercel environment variables." });
   }
 
   let body = req.body;
   try {
-    if (typeof body === 'string') body = JSON.parse(body);
+    if (typeof body === "string") body = JSON.parse(body);
   } catch (err) {
-    return res.status(400).json({ error: 'Invalid JSON body' });
+    return res.status(400).json({ error: "Invalid JSON body" });
   }
 
   const { type, imageB64, itemName, category, city } = body || {};
 
   let geminiBody;
   try {
-    if (type === 'analyze') {
-      if (!imageB64) throw new Error('Missing imageB64');
+    if (type === "analyze") {
+      if (!imageB64) throw new Error("Missing imageB64");
       geminiBody = PROMPTS.analyze(imageB64);
-    } else if (type === 'impact') {
-      if (!itemName || !category) throw new Error('Missing itemName or category');
+    } else if (type === "impact") {
+      if (!itemName || !category) throw new Error("Missing itemName or category");
       geminiBody = PROMPTS.impact(itemName, category);
-    } else if (type === 'centers') {
-      if (!category) throw new Error('Missing category');
-      geminiBody = PROMPTS.centers(itemName || 'waste item', category, city || 'India');
+    } else if (type === "centers") {
+      if (!category) throw new Error("Missing category");
+      geminiBody = PROMPTS.centers(itemName || "waste item", category, city || "India");
     } else {
       throw new Error(`Unknown type: ${type}`);
     }
@@ -194,25 +192,52 @@ export default async function handler(req, res) {
     geminiBody.generationConfig.thinkingConfig = { thinkingBudget: 0 };
 
     const geminiRes = await fetch(`${GEMINI_API_URL}?key=${apiKey}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(geminiBody),
     });
 
     if (!geminiRes.ok) {
       const errText = await geminiRes.text();
-      console.error('Gemini error:', errText);
-      return res.status(geminiRes.status).json({ error: 'Gemini API error', detail: errText });
+      console.error("Gemini error:", errText);
+      return res.status(geminiRes.status).json({ error: "Gemini API error", detail: errText });
     }
 
     const geminiData = await geminiRes.json();
     const parts = geminiData?.candidates?.[0]?.content?.parts || [];
-    const rawText = parts.filter(p => p.text).map(p => p.text).pop() || '';
-    const clean = rawText.replace(/```json|```/g, '').trim();
-    const parsed = JSON.parse(clean);
+    const rawText = parts.filter(p => p.text).map(p => p.text).pop() || "";
+    let clean = rawText.replace(/```json|```/g, "").trim();
+
+    let parsed;
+    try {
+      parsed = JSON.parse(clean);
+    } catch (parseErr) {
+      console.warn("Direct JSON parse failed, attempting repair:", parseErr.message);
+      const startIdx = clean.indexOf("{");
+      if (startIdx !== -1) {
+        const lastItemClose = clean.lastIndexOf("}");
+        if (lastItemClose > startIdx) {
+          const candidate = clean.substring(startIdx, lastItemClose + 1);
+          try {
+            parsed = JSON.parse(candidate);
+          } catch (_) {
+            try {
+              parsed = JSON.parse(candidate + "]}");
+            } catch (_) {
+              try {
+                parsed = JSON.parse(candidate + "}");
+              } catch (_) {}
+            }
+          }
+        }
+      }
+      if (!parsed) {
+        throw new Error(`AI response could not be parsed: ${parseErr.message}`);
+      }
+    }
     return res.status(200).json(parsed);
   } catch (err) {
-    console.error('Handler error:', err);
-    return res.status(500).json({ error: 'Internal server error', detail: err.message });
+    console.error("Handler error:", err);
+    return res.status(500).json({ error: "Internal server error", detail: err.message });
   }
 }

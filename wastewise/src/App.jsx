@@ -11,7 +11,7 @@ import {
   syncSpendToSupabase,
   syncEarningToSupabase
 } from "./supabase";
-import { WASTE_STREAMS, validateWasteClassification } from "./wasteRules";
+import { WASTE_STREAMS, validateWasteClassification, validateMultiObjectScan, parseBoundingBox } from "./wasteRules";
 
 // ─── Animated Go Logo ─────────────────────────────────────────────────────────
 const GO_TAGLINES = ["Go Green", "Go Clean", "Go Smart", "Go Local", "Go Zero", "Go Earth"];
@@ -494,8 +494,11 @@ function AuthPage({onLogin, isDark, toggleDark}) {
 function ScannerPage({user, onScanComplete, t, isDark}) {
   const [image,setImage]=useState(null);
   const [imgB64,setImgB64]=useState(null);
-  const [result,setResult]=useState(null);
-  const [rawResult,setRawResult]=useState(null);
+  const [scanData,setScanData]=useState(null);
+  const [selectedId,setSelectedId]=useState(null);
+  const [rawMultiResponse,setRawMultiResponse]=useState(null);
+  const [conditionOverrides,setConditionOverrides]=useState({});
+  const [imageRect,setImageRect]=useState(null);
   const [loading,setLoading]=useState(false);
   const [error,setError]=useState(null);
   const [dragOver,setDragOver]=useState(false);
@@ -512,7 +515,66 @@ function ScannerPage({user, onScanComplete, t, isDark}) {
   const [newPts,setNewPts]=useState(null);
   const [showBurst,setShowBurst]=useState(false);
 
-  const fileRef=useRef(), videoRef=useRef(), streamRef=useRef(null);
+  const fileRef=useRef(), videoRef=useRef(), streamRef=useRef(null), imgDisplayRef=useRef(null);
+
+  const SCAN_STEPS = [
+    "Scanning image for waste & reusable items...",
+    "Detecting multiple objects and coordinates...",
+    "Evaluating condition & circular reuse potential...",
+    "Applying multi-stream segregation rules...",
+    "Finalizing disposal routes & recommendations...",
+  ];
+  const [scanStepIdx, setScanStepIdx] = useState(0);
+  useEffect(() => {
+    if (!loading) { setScanStepIdx(0); return; }
+    const timer = setInterval(() => {
+      setScanStepIdx(idx => (idx + 1) % SCAN_STEPS.length);
+    }, 1600);
+    return () => clearInterval(timer);
+  }, [loading]);
+
+  const updateImageRenderRect = useCallback(() => {
+    const img = imgDisplayRef.current;
+    if (!img) return;
+    const naturalW = img.naturalWidth || 1;
+    const naturalH = img.naturalHeight || 1;
+    const naturalRatio = naturalW / naturalH;
+
+    const clientW = img.clientWidth || 1;
+    const clientH = img.clientHeight || 1;
+    const clientRatio = clientW / clientH;
+
+    let renderW = clientW;
+    let renderH = clientH;
+    let offsetX = 0;
+    let offsetY = 0;
+
+    if (naturalRatio > clientRatio) {
+      renderH = clientW / naturalRatio;
+      offsetY = (clientH - renderH) / 2;
+    } else {
+      renderW = clientH * naturalRatio;
+      offsetX = (clientW - renderW) / 2;
+    }
+
+    setImageRect({
+      top: offsetY,
+      left: offsetX,
+      width: renderW,
+      height: renderH,
+    });
+  }, []);
+
+  useEffect(() => {
+    window.addEventListener("resize", updateImageRenderRect);
+    return () => window.removeEventListener("resize", updateImageRenderRect);
+  }, [updateImageRenderRect]);
+
+  useEffect(() => {
+    if (scanData && imgDisplayRef.current) {
+      updateImageRenderRect();
+    }
+  }, [scanData, updateImageRenderRect]);
 
   const startCamera = async (facing=facingMode) => {
     setCameraError(null);
@@ -526,6 +588,18 @@ function ScannerPage({user, onScanComplete, t, isDark}) {
 
   const stopCamera=()=>{if(streamRef.current){streamRef.current.getTracks().forEach(t=>t.stop());streamRef.current=null;}};
   const flipCamera=()=>{const n=facingMode==="environment"?"user":"environment";setFacingMode(n);startCamera(n);};
+  const clearScan = () => {
+    setScanData(null);
+    setSelectedId(null);
+    setRawMultiResponse(null);
+    setConditionOverrides({});
+    setImageRect(null);
+    setImpact(null);
+    setError(null);
+    setCenters(null);
+    setCentersError(null);
+  };
+
   const capturePhoto=async()=>{
     if(!videoRef.current) return;
     const v=videoRef.current,c=document.createElement("canvas");
@@ -533,11 +607,11 @@ function ScannerPage({user, onScanComplete, t, isDark}) {
     const raw=c.toDataURL("image/jpeg",.92);
     const d=await compressImage(raw);
     setImage(d);setImgB64(d.split(",")[1]);
-    setResult(null);setImpact(null);setError(null);setCenters(null);
+    clearScan();
     stopCamera();setInputMode("upload");
   };
   const switchMode=(mode)=>{
-    if(mode==="camera"){setInputMode("camera");setImage(null);setImgB64(null);setResult(null);setImpact(null);setCenters(null);setTimeout(()=>startCamera(),120);}
+    if(mode==="camera"){setInputMode("camera");setImage(null);setImgB64(null);clearScan();setTimeout(()=>startCamera(),120);}
     else{stopCamera();setInputMode("upload");}
   };
   // ── Compress image to stay under Netlify's 1 MB body limit ──
@@ -564,7 +638,7 @@ function ScannerPage({user, onScanComplete, t, isDark}) {
     const r=new FileReader();
     r.onload=async(e)=>{
       const compressed = await compressImage(e.target.result);
-      setImage(compressed);setImgB64(compressed.split(",")[1]);setResult(null);setImpact(null);setError(null);setCenters(null);
+      setImage(compressed);setImgB64(compressed.split(",")[1]);clearScan();
     };
     r.readAsDataURL(file);
   },[]);
@@ -586,27 +660,43 @@ function ScannerPage({user, onScanComplete, t, isDark}) {
 
   const analyzeWaste=async()=>{
     if(!imgB64) return;
-    setLoading(true);setError(null);setResult(null);setRawResult(null);setImpact(null);setCenters(null);
+    setLoading(true);setError(null);setScanData(null);setSelectedId(null);setRawMultiResponse(null);setConditionOverrides({});setImpact(null);setCenters(null);
     try {
       const data = await callAI({
         type: "analyze",
         imageB64: imgB64,
       });
-      setRawResult(data);
-      const validated = validateWasteClassification(data);
-      setResult(validated);
-      fetchImpact(validated.itemName, validated.category, validated);
-      findCenters(validated.category, validated.itemName);
+      setRawMultiResponse(data);
+      const validated = validateMultiObjectScan(data);
+      setScanData(validated);
+      if (validated.items.length > 0) {
+        const first = validated.items[0];
+        setSelectedId(first.id);
+        fetchImpact(first.itemName, first.category, first);
+        findCenters(first.category, first.itemName);
+      }
+      setTimeout(updateImageRenderRect, 100);
     } catch (err) { setError(err.message || "Could not analyze. Try a clearer photo."); }
     finally { setLoading(false); }
   };
 
-  const handleConditionChange=(newCondition)=>{
-    if(!rawResult && !result) return;
-    const base = rawResult || result;
-    const updated = validateWasteClassification(base, newCondition);
-    setResult(updated);
-    if(updated.category !== result?.category) {
+  const handleSelectItem = (id) => {
+    setSelectedId(id);
+    const item = scanData?.items?.find(it => it.id === id);
+    if (item) {
+      fetchImpact(item.itemName, item.category, item);
+      findCenters(item.category, item.itemName);
+    }
+  };
+
+  const handleConditionChange = (newCondition) => {
+    if (!selectedId || !rawMultiResponse) return;
+    const newOverrides = { ...conditionOverrides, [selectedId]: newCondition };
+    setConditionOverrides(newOverrides);
+    const revalidated = validateMultiObjectScan(rawMultiResponse, newOverrides);
+    setScanData(revalidated);
+    const updated = revalidated.items.find(it => it.id === selectedId);
+    if (updated) {
       fetchImpact(updated.itemName, updated.category, updated);
       findCenters(updated.category, updated.itemName);
     }
@@ -658,10 +748,22 @@ function ScannerPage({user, onScanComplete, t, isDark}) {
     finally { setCentersLoading(false); }
   };
 
-  const reset=()=>{stopCamera();setInputMode("upload");setImage(null);setImgB64(null);setResult(null);setRawResult(null);setImpact(null);setError(null);setCenters(null);setCentersError(null);setUserCity(null);setCustomCityInput("");};
-  const cat=result?(CATS[result.category]||WASTE_STREAMS[result.category]||CATS.dry):null;
+  const reset=()=>{
+    stopCamera();
+    setInputMode("upload");
+    setImage(null);
+    setImgB64(null);
+    clearScan();
+    setUserCity(null);
+    setCustomCityInput("");
+  };
+
+  const items = scanData?.items || [];
+  const selectedItem = items.find(it => it.id === selectedId) || items[0] || null;
+  const result = selectedItem;
+  const cat = selectedItem ? (CATS[selectedItem.category] || WASTE_STREAMS[selectedItem.category] || CATS.dry) : null;
   const catColor = cat ? (isDark ? cat.color : cat.darkColor) : t.green;
-  const confPct = result ? Math.round(result.confidence <= 1 ? result.confidence * 100 : result.confidence) : 0;
+  const confPct = selectedItem ? Math.round(selectedItem.confidence <= 1 ? selectedItem.confidence * 100 : selectedItem.confidence) : 0;
   const confLevel = confPct >= 80
     ? { label: "High Confidence", color: t.green }
     : confPct >= 50
@@ -675,16 +777,18 @@ function ScannerPage({user, onScanComplete, t, isDark}) {
       {newPts&&<div style={{position:"fixed",top:"34%",left:"50%",zIndex:1000,animation:"ww-coinsfly 2.2s ease-out forwards",pointerEvents:"none"}}><div style={{background:"linear-gradient(135deg,#f59e0b,#fbbf24)",borderRadius:40,padding:"10px 24px",fontFamily:"'Outfit',sans-serif",fontSize:22,fontWeight:800,color:"#1a0a00",boxShadow:"0 8px 32px rgba(251,191,36,.6)",whiteSpace:"nowrap"}}>+{newPts} 🪙 EcoCoins!</div></div>}
 
       {/* Mode selector */}
-      <div style={{display:"flex",gap:6,marginBottom:12,background:isDark?"rgba(0,0,0,.4)":"rgba(0,0,0,.06)",borderRadius:14,padding:4}}>
-        {[{id:"upload",icon:"📁",label:"Upload Photo"},{id:"camera",icon:"📷",label:"Live Camera"}].map(m=>(
-          <button key={m.id} onClick={()=>switchMode(m.id)} style={{flex:1,padding:"10px",borderRadius:10,border:"none",cursor:"pointer",fontFamily:"'Outfit',sans-serif",fontSize:13,fontWeight:600,transition:"all .2s",background:inputMode===m.id?`linear-gradient(135deg,${t.greenDeep}40,${t.green}30)`:"transparent",color:inputMode===m.id?t.green:t.textMid,boxShadow:inputMode===m.id?`inset 0 0 0 1px ${t.borderGreen}`:"none"}}>
-            {m.icon} {m.label}
-          </button>
-        ))}
-      </div>
+      {!scanData && (
+        <div style={{display:"flex",gap:6,marginBottom:12,background:isDark?"rgba(0,0,0,.4)":"rgba(0,0,0,.06)",borderRadius:14,padding:4}}>
+          {[{id:"upload",icon:"📁",label:"Upload Photo"},{id:"camera",icon:"📷",label:"Live Camera"}].map(m=>(
+            <button key={m.id} onClick={()=>switchMode(m.id)} style={{flex:1,padding:"10px",borderRadius:10,border:"none",cursor:"pointer",fontFamily:"'Outfit',sans-serif",fontSize:13,fontWeight:600,transition:"all .2s",background:inputMode===m.id?`linear-gradient(135deg,${t.greenDeep}40,${t.green}30)`:"transparent",color:inputMode===m.id?t.green:t.textMid,boxShadow:inputMode===m.id?`inset 0 0 0 1px ${t.borderGreen}`:"none"}}>
+              {m.icon} {m.label}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Camera */}
-      {inputMode==="camera"&&(
+      {!scanData && inputMode==="camera"&&(
         <div style={{borderRadius:22,overflow:"hidden",border:`1.5px solid ${t.borderGreen}`,position:"relative",background:"#000",minHeight:270}}>
           {cameraError?(
             <div style={{padding:"44px 20px",textAlign:"center"}}><div style={{fontSize:36,marginBottom:12}}>📷</div><p style={{color:t.red,fontSize:13,marginBottom:14}}>{cameraError}</p><button onClick={()=>startCamera()} style={{padding:"9px 18px",background:isDark?"rgba(74,222,128,.15)":"rgba(22,163,74,.1)",border:`1px solid ${t.borderGreen}`,borderRadius:10,color:t.green,fontSize:13,cursor:"pointer"}}>Try Again</button></div>
@@ -713,7 +817,7 @@ function ScannerPage({user, onScanComplete, t, isDark}) {
       )}
 
       {/* Upload */}
-      {inputMode==="upload"&&(
+      {!scanData && inputMode==="upload"&&(
         <div className="ww-upload" onDragOver={e=>{e.preventDefault();setDragOver(true)}} onDragLeave={()=>setDragOver(false)} onDrop={e=>{e.preventDefault();setDragOver(false);processFile(e.dataTransfer.files[0])}} onClick={()=>fileRef.current.click()}
           style={{border:`2px dashed ${dragOver?t.green:t.borderGreen}`,borderRadius:22,padding:image?0:"48px 24px",cursor:"pointer",transition:"all .3s",background:dragOver?t.leaf1:isDark?"rgba(255,255,255,.015)":"rgba(255,255,255,.6)",overflow:"hidden"}}>
           {image?(
@@ -729,16 +833,319 @@ function ScannerPage({user, onScanComplete, t, isDark}) {
       )}
       <input ref={fileRef} type="file" accept="image/*" style={{display:"none"}} onChange={e=>processFile(e.target.files[0])}/>
 
-      {image&&inputMode==="upload"&&(
+      {!scanData && image && inputMode==="upload"&&(
         <button className="ww-btn-green" onClick={analyzeWaste} disabled={loading}
           style={{width:"100%",marginTop:12,padding:"16px",background:loading?t.bgCard:`linear-gradient(135deg,${t.greenDeep},${t.green})`,border:`1px solid ${t.borderGreen}`,borderRadius:16,cursor:loading?"not-allowed":"pointer",color:loading?t.textMid:isDark?"#030a03":"#fff",fontSize:15,fontWeight:700,fontFamily:"'Outfit',sans-serif",letterSpacing:.3,display:"flex",alignItems:"center",justifyContent:"center",gap:8,boxShadow:loading?"none":`0 6px 24px rgba(74,222,128,.3)`}}>
-          {loading?<><Spinner color={t.green}/>Analyzing with AI...</>:"🔍 Identify & Classify Waste"}
+          {loading ? (
+            <>
+              <Spinner color={t.green}/>
+              <span style={{fontFamily:"'Outfit',sans-serif",fontSize:14,color:t.green,fontWeight:600}}>
+                {SCAN_STEPS[scanStepIdx]}
+              </span>
+            </>
+          ) : (
+            "🔍 Scan & Identify All Waste Objects"
+          )}
         </button>
       )}
 
       {error&&<div style={{marginTop:12,padding:"13px 16px",background:isDark?"rgba(248,113,113,.08)":"rgba(220,38,38,.06)",border:"1px solid rgba(248,113,113,.3)",borderRadius:14,color:t.red,fontSize:13,fontFamily:"'Outfit',sans-serif"}}>⚠️ {error}</div>}
 
-      {/* ── RESULT ── */}
+      {/* Empty state: No waste items detected */}
+      {scanData && items.length === 0 && (
+        <Card t={t} style={{marginTop:18,padding:"36px 20px",textAlign:"center",borderRadius:24,border:`1.5px dashed ${t.border}`}}>
+          <div style={{fontSize:44,marginBottom:12}}>🔍</div>
+          <div style={{fontFamily:"'Fraunces',serif",fontSize:22,fontWeight:800,color:t.text,marginBottom:8}}>
+            No Waste or Circular Items Detected
+          </div>
+          <p style={{fontSize:13,color:t.textMid,maxWidth:440,margin:"0 auto 16px",lineHeight:1.6,fontFamily:"'Outfit',sans-serif"}}>
+            We analyzed your photo and did not detect any discarded packaging, recyclables, or reusable items. The photo might only show architectural background (walls, floors, ceiling) or items may be too distant.
+          </p>
+          <button onClick={reset} style={{padding:"11px 22px",background:`linear-gradient(135deg,${t.greenDeep},${t.green})`,border:"none",borderRadius:12,color:isDark?"#030a03":"#fff",fontWeight:700,cursor:"pointer",fontFamily:"'Outfit',sans-serif",boxShadow:`0 4px 16px rgba(74,222,128,.3)`}}>
+            📸 Scan Another Photo
+          </button>
+        </Card>
+      )}
+
+      {/* Multi-object interactive scan results */}
+      {scanData && items.length > 0 && image && (
+        <div style={{marginTop:18,animation:"ww-slideup .4s ease"}}>
+          {/* Interactive Bounding Box Scene Container */}
+          <div style={{
+            position:"relative",
+            borderRadius:22,
+            overflow:"hidden",
+            background:"#030a03",
+            border:`1.5px solid ${t.borderGreen}`,
+            marginBottom:14,
+            boxShadow:"0 8px 32px rgba(0,0,0,.45)"
+          }}>
+            <img
+              ref={imgDisplayRef}
+              src={image}
+              alt="Scanned scene"
+              onLoad={updateImageRenderRect}
+              style={{
+                width:"100%",
+                maxHeight:390,
+                objectFit:"contain",
+                display:"block",
+                margin:"0 auto",
+                userSelect:"none"
+              }}
+            />
+
+            {/* Letterbox-aligned bounding boxes layer */}
+            <div style={{
+              position:"absolute",
+              top:imageRect ? imageRect.top : 0,
+              left:imageRect ? imageRect.left : 0,
+              width:imageRect ? imageRect.width : "100%",
+              height:imageRect ? imageRect.height : "100%",
+              pointerEvents:"none"
+            }}>
+              {items.map((item) => {
+                if (!item.boundingBox) return null;
+                const isSelected = item.id === selectedId;
+                const stream = item.stream || CATS[item.category] || WASTE_STREAMS[item.category] || CATS.dry;
+                const color = stream.color || t.green;
+                const { topPct, leftPct, widthPct, heightPct } = item.boundingBox;
+                const labelBelow = topPct < 15;
+
+                return (
+                  <div
+                    key={item.id}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleSelectItem(item.id);
+                    }}
+                    title={`${item.object || item.itemName} (${stream.shortLabel || stream.label}) - Click to inspect`}
+                    style={{
+                      position:"absolute",
+                      top:`${topPct}%`,
+                      left:`${leftPct}%`,
+                      width:`${widthPct}%`,
+                      height:`${heightPct}%`,
+                      border:isSelected ? `2.5px solid ${color}` : `1.5px dashed ${color}b0`,
+                      backgroundColor:isSelected ? `${color}28` : `${color}0c`,
+                      boxShadow:isSelected ? `0 0 20px ${color}80, inset 0 0 14px ${color}40` : "none",
+                      borderRadius:6,
+                      cursor:"pointer",
+                      pointerEvents:"auto",
+                      transition:"all .2s ease",
+                      zIndex:isSelected ? 30 : 10,
+                    }}
+                  >
+                    {/* Corner brackets */}
+                    <div style={{position:"absolute",top:-2,left:-2,width:8,height:8,borderTop:`3px solid ${color}`,borderLeft:`3px solid ${color}`,borderRadius:"3px 0 0 0"}}/>
+                    <div style={{position:"absolute",top:-2,right:-2,width:8,height:8,borderTop:`3px solid ${color}`,borderRight:`3px solid ${color}`,borderRadius:"0 3px 0 0"}}/>
+                    <div style={{position:"absolute",bottom:-2,left:-2,width:8,height:8,borderBottom:`3px solid ${color}`,borderLeft:`3px solid ${color}`,borderRadius:"0 0 0 3px"}}/>
+                    <div style={{position:"absolute",bottom:-2,right:-2,width:8,height:8,borderBottom:`3px solid ${color}`,borderRight:`3px solid ${color}`,borderRadius:"0 0 3px 0"}}/>
+
+                    {/* Tag badge with object name and category */}
+                    <div
+                      style={{
+                        position:"absolute",
+                        left:0,
+                        ...(labelBelow ? {top:"100%",marginTop:4} : {bottom:"100%",marginBottom:4}),
+                        background:isSelected ? color : "rgba(3, 10, 3, 0.9)",
+                        color:isSelected ? "#030a03" : "#fff",
+                        border:`1px solid ${color}`,
+                        borderRadius:6,
+                        padding:"2px 8px",
+                        fontSize:11,
+                        fontWeight:700,
+                        fontFamily:"'Outfit',sans-serif",
+                        whiteSpace:"nowrap",
+                        display:"flex",
+                        alignItems:"center",
+                        gap:5,
+                        boxShadow:"0 3px 12px rgba(0,0,0,.6)",
+                        backdropFilter:"blur(6px)",
+                        zIndex:35,
+                      }}
+                    >
+                      <span>{stream.emoji || "📦"}</span>
+                      <span>{item.object || item.itemName}</span>
+                      {isSelected && <span style={{fontSize:9,opacity:.9}}>●</span>}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Tap hint */}
+            <div style={{
+              position:"absolute",
+              bottom:8,
+              right:10,
+              background:"rgba(0,0,0,.65)",
+              backdropFilter:"blur(6px)",
+              padding:"4px 9px",
+              borderRadius:8,
+              fontSize:10,
+              color:t.textDim,
+              fontFamily:"'Outfit',sans-serif",
+              pointerEvents:"none"
+            }}>
+              💡 Tap any box to inspect
+            </div>
+          </div>
+
+          {/* Dynamic Summary Bar */}
+          <div style={{
+            display:"flex",
+            alignItems:"center",
+            justifyContent:"space-between",
+            gap:10,
+            padding:"12px 16px",
+            borderRadius:16,
+            background:isDark ? "rgba(255,255,255,.03)" : "rgba(255,255,255,.7)",
+            border:`1px solid ${t.borderGreen}`,
+            marginBottom:12,
+            flexWrap:"wrap"
+          }}>
+            <div style={{display:"flex",alignItems:"center",gap:8}}>
+              <span style={{fontSize:18}}>🎯</span>
+              <span style={{fontFamily:"'Outfit',sans-serif",fontWeight:700,fontSize:14,color:t.text}}>
+                {items.length} {items.length === 1 ? "Item" : "Items"} Detected
+              </span>
+            </div>
+            <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
+              {scanData.summary?.map((s) => (
+                <span
+                  key={s.label}
+                  style={{
+                    fontSize:11,
+                    fontFamily:"'Outfit',sans-serif",
+                    fontWeight:700,
+                    padding:"3px 9px",
+                    borderRadius:20,
+                    background:`${s.color || t.green}20`,
+                    color:isDark ? (s.color || t.green) : (s.darkColor || s.color || t.green),
+                    border:`1px solid ${s.color || t.green}40`,
+                    display:"inline-flex",
+                    alignItems:"center",
+                    gap:4
+                  }}
+                >
+                  <span>{s.emoji}</span>
+                  <span>{s.count} {s.label}</span>
+                </span>
+              ))}
+              <button
+                onClick={reset}
+                style={{
+                  background:"transparent",
+                  border:`1px solid ${t.border}`,
+                  borderRadius:12,
+                  padding:"3px 8px",
+                  fontSize:11,
+                  color:t.textMid,
+                  cursor:"pointer",
+                  fontFamily:"'Outfit',sans-serif",
+                  fontWeight:600,
+                  marginLeft:4
+                }}
+              >
+                📸 New Photo
+              </button>
+            </div>
+          </div>
+
+          {/* Horizontal Item Selector Strip (when > 1 items detected) */}
+          {items.length > 1 && (
+            <div style={{marginBottom:14}}>
+              <div style={{
+                fontSize:10,
+                color:t.textDim,
+                letterSpacing:1.5,
+                textTransform:"uppercase",
+                marginBottom:8,
+                fontFamily:"'Outfit',sans-serif",
+                fontWeight:700
+              }}>
+                SELECT ITEM TO INSPECT ({items.length})
+              </div>
+              <div style={{
+                display:"flex",
+                gap:8,
+                overflowX:"auto",
+                paddingBottom:6,
+                scrollbarWidth:"thin"
+              }}>
+                {items.map((item) => {
+                  const isSel = item.id === selectedId;
+                  const sStream = item.stream || CATS[item.category] || WASTE_STREAMS[item.category] || CATS.dry;
+                  const sColor = sStream.color || t.green;
+                  return (
+                    <button
+                      key={item.id}
+                      onClick={() => handleSelectItem(item.id)}
+                      style={{
+                        flexShrink:0,
+                        display:"flex",
+                        alignItems:"center",
+                        gap:8,
+                        padding:"9px 14px",
+                        borderRadius:14,
+                        border:isSel ? `2px solid ${sColor}` : `1px solid ${t.border}`,
+                        background:isSel
+                          ? (isDark ? `${sColor}25` : `${sColor}18`)
+                          : (isDark ? "rgba(255,255,255,.03)" : "rgba(255,255,255,.6)"),
+                        color:isSel ? (isDark ? sColor : sStream.darkColor || sColor) : t.text,
+                        cursor:"pointer",
+                        transition:"all .2s ease",
+                        boxShadow:isSel ? `0 4px 14px ${sColor}30` : "none",
+                      }}
+                    >
+                      <span style={{fontSize:16}}>{sStream.emoji || "📦"}</span>
+                      <div style={{textAlign:"left"}}>
+                        <div style={{
+                          fontFamily:"'Outfit',sans-serif",
+                          fontWeight:700,
+                          fontSize:13,
+                          whiteSpace:"nowrap",
+                          color:isSel ? (isDark ? sColor : sStream.darkColor || sColor) : t.text
+                        }}>
+                          {item.object || item.itemName}
+                        </div>
+                        <div style={{
+                          fontSize:10,
+                          color:t.textDim,
+                          fontFamily:"'Outfit',sans-serif",
+                          fontWeight:500
+                        }}>
+                          {sStream.shortLabel || sStream.label}
+                        </div>
+                      </div>
+                      {isSel && (
+                        <span style={{
+                          marginLeft:4,
+                          fontSize:10,
+                          background:sColor,
+                          color:"#030a03",
+                          borderRadius:"50%",
+                          width:16,
+                          height:16,
+                          display:"inline-flex",
+                          alignItems:"center",
+                          justifyContent:"center",
+                          fontWeight:800
+                        }}>
+                          ✓
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── RESULT INSPECTOR ── */}
       {result&&cat&&(
         <div style={{marginTop:18,animation:"ww-slideup .5s ease"}}>
           {/* Category hero */}

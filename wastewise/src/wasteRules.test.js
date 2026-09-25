@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { validateWasteClassification, WASTE_STREAMS } from "./wasteRules.js";
+import { validateWasteClassification, parseBoundingBox, validateMultiObjectScan, WASTE_STREAMS } from "./wasteRules.js";
 
 test("CASE 1: Bed (intact / usable) -> REUSE / DONATE, bin is null, NEVER blue-bin dry waste", () => {
   // Even if raw Gemini erroneously said "dry" and "Blue Bin"
@@ -182,4 +182,138 @@ test("STRICT SAFETY: Mattress and Wardrobe are never household-bin dry waste", (
   const wardrobe = validateWasteClassification({ object: "wardrobe", category: "dry", bin: "Blue Bin" });
   assert.equal(wardrobe.bin, null);
   assert.equal(wardrobe.category, "BULKY_WASTE");
+});
+
+// ─── MULTI-OBJECT & BOUNDING BOX TESTS ──────────────────────────────────────────
+
+test("MULTI-OBJECT: parseBoundingBox normalizes [ymin, xmin, ymax, xmax] accurately", () => {
+  // Valid 0..1000 object
+  const b1 = parseBoundingBox({ ymin: 250, xmin: 100, ymax: 800, xmax: 600 });
+  assert.equal(b1.topPct, 25);
+  assert.equal(b1.leftPct, 10);
+  assert.equal(b1.widthPct, 50);
+  assert.equal(b1.heightPct, 55);
+
+  // Valid array [ymin, xmin, ymax, xmax]
+  const b2 = parseBoundingBox([400, 300, 700, 800]);
+  assert.equal(b2.topPct, 40);
+  assert.equal(b2.leftPct, 30);
+  assert.equal(b2.widthPct, 50);
+  assert.equal(b2.heightPct, 30);
+
+  // 0..1 float scaling
+  const b3 = parseBoundingBox([0.1, 0.2, 0.5, 0.6]);
+  assert.equal(b3.ymin, 100);
+  assert.equal(b3.xmin, 200);
+  assert.equal(b3.ymax, 500);
+  assert.equal(b3.xmax, 600);
+  assert.equal(b3.topPct, 10);
+
+  // Invalid box: xmin >= xmax
+  assert.equal(parseBoundingBox([100, 500, 300, 200]), null);
+  // Invalid box: ymin >= ymax
+  assert.equal(parseBoundingBox([600, 100, 200, 400]), null);
+  // Invalid box: non-numeric
+  assert.equal(parseBoundingBox("not-a-box"), null);
+});
+
+test("MULTI-OBJECT: validateMultiObjectScan handles room with Bed + 2 Bottles + Battery + Chair", () => {
+  const roomResponse = {
+    items: [
+      {
+        id: "item-1",
+        object: "Bed",
+        condition: "usable",
+        category: "dry", // Raw AI mistakenly said dry
+        bin: "Blue Bin", // Raw AI mistakenly assigned Blue Bin
+        boundingBox: [200, 100, 800, 600]
+      },
+      {
+        id: "item-2",
+        object: "Plastic Bottle #1",
+        category: "dry",
+        boundingBox: [150, 650, 400, 750]
+      },
+      {
+        id: "item-3",
+        object: "Plastic Bottle #2",
+        category: "dry",
+        boundingBox: [420, 660, 670, 760]
+      },
+      {
+        id: "item-4",
+        object: "AA Battery",
+        category: "dry", // Raw AI mistakenly said dry
+        boundingBox: [700, 700, 850, 780]
+      },
+      {
+        id: "item-5",
+        object: "Desk Chair",
+        condition: "usable",
+        boundingBox: [300, 400, 650, 550]
+      }
+    ]
+  };
+
+  const result = validateMultiObjectScan(roomResponse);
+
+  assert.equal(result.count, 5);
+  assert.equal(result.items.length, 5);
+
+  // Bed must be corrected to REUSABLE and bin: null
+  const bed = result.items[0];
+  assert.equal(bed.category, "REUSABLE");
+  assert.equal(bed.action, "REUSE");
+  assert.equal(bed.bin, null, "Bed bin must strictly be null");
+  assert.ok(bed.boundingBox);
+  assert.equal(bed.boundingBox.topPct, 20);
+
+  // Both bottles must be preserved as distinct instances
+  const b1 = result.items[1];
+  const b2 = result.items[2];
+  assert.equal(b1.id, "item-2");
+  assert.equal(b2.id, "item-3");
+  assert.equal(b1.category, "RECYCLABLE");
+  assert.equal(b2.category, "RECYCLABLE");
+  assert.notEqual(b1.boundingBox.topPct, b2.boundingBox.topPct);
+
+  // Battery must be corrected to SPECIAL_CARE_WASTE and bin: null
+  const battery = result.items[3];
+  assert.equal(battery.category, "SPECIAL_CARE_WASTE");
+  assert.equal(battery.bin, null);
+
+  // Chair must be REUSABLE
+  const chair = result.items[4];
+  assert.equal(chair.category, "REUSABLE");
+  assert.equal(chair.bin, null);
+
+  // Dynamic summary counts check
+  assert.ok(result.summary.length >= 3);
+  const recyclableSummary = result.summary.find(s => s.label === "Recyclable");
+  assert.equal(recyclableSummary.count, 2);
+  const reusableSummary = result.summary.find(s => s.label === "Reusable");
+  assert.equal(reusableSummary.count, 2);
+  const specialCareSummary = result.summary.find(s => s.label === "Special Care");
+  assert.equal(specialCareSummary.count, 1);
+});
+
+test("MULTI-OBJECT: Single-object legacy response is cleanly wrapped and validated", () => {
+  const singleObj = {
+    object: "Single Aluminium Can",
+    category: "dry",
+    boundingBox: [200, 300, 600, 500]
+  };
+
+  const result = validateMultiObjectScan(singleObj);
+  assert.equal(result.count, 1);
+  assert.equal(result.items[0].category, "RECYCLABLE");
+  assert.equal(result.items[0].boundingBox.topPct, 20);
+});
+
+test("MULTI-OBJECT: Empty items array returns count 0 gracefully", () => {
+  const emptyResponse = { items: [] };
+  const result = validateMultiObjectScan(emptyResponse);
+  assert.equal(result.count, 0);
+  assert.equal(result.items.length, 0);
+  assert.equal(result.summary.length, 0);
 });
