@@ -11,17 +11,71 @@ const PROMPTS = {
           }
         },
         {
-          text: `You are WasteWise, an expert on India's waste management system.\nAnalyze this image carefully and identify what waste item is shown.\nRespond ONLY with a valid JSON object — no markdown, no backticks, no explanation:\n{\n  "itemName": "specific common name of the item",\n  "category": "wet" or "dry" or "hazardous" or "ewaste" or "sanitary",\n  "confidence": number from 0 to 100,\n  "disposal": "one clear sentence on how to dispose in India",\n  "tip": "one practical eco-tip for this item",\n  "recyclable": true or false,\n  "decompositionDays": number or null,\n  "impactStat": "one shocking statistic about this type of waste in India"\n}\nCategories: wet=food/organic, dry=paper/plastic/glass/metal, hazardous=chemicals/batteries/paint, ewaste=electronics, sanitary=diapers/pads`
+          text: `You are an AI waste-management and circular-economy classification assistant.
+Analyze this uploaded image carefully.
+
+IMPORTANT RULES:
+1. Do NOT assume that every visible object is waste. A reusable or normal functional object is NOT automatically waste.
+2. First identify the primary object and its material composition.
+3. Determine whether the object appears to be:
+   - A normal item that is likely still in use / reusable
+   - An unwanted but potentially reusable item
+   - Actual waste
+   - A large/bulky item requiring a different disposal route
+   - A special-care item
+   - Uncertain
+4. Prioritize REUSE and DONATION when an item appears usable.
+5. Large furniture and bulky objects (beds, mattresses, sofas, couches, wardrobes, large tables, large chairs, carpets, large appliances) must NEVER be classified as ordinary household-bin waste. For usable furniture, recommend REUSE / DONATE. If damaged or unwanted, recommend BULKY_WASTE collection.
+6. The model must distinguish:
+   - object / itemName: specific name of the object
+   - material: main material(s)
+   - isWaste: boolean (false if usable or still in service)
+   - condition: "usable" | "damaged" | "unknown"
+   - conditionConfidence: number between 0.0 and 1.0
+   - category: "WET_WASTE" | "DRY_WASTE" | "SANITARY_WASTE" | "SPECIAL_CARE_WASTE" | "BULKY_WASTE" | "E_WASTE" | "TEXTILE" | "RECYCLABLE" | "COMPOSTABLE" | "REUSABLE" | "GENERAL_WASTE" | "UNKNOWN"
+   - action: "REUSE" | "DONATE" | "RECYCLE" | "COMPOST" | "SPECIAL_DISPOSAL" | "BULKY_WASTE" | "GENERAL_DISPOSAL" | "UNKNOWN"
+   - disposalRoute: clear route description (e.g. "Donate to charity or resell if usable; otherwise schedule bulky waste pickup")
+   - bin: null (never recommend an unverified household bin for bulky furniture, e-waste, or batteries)
+   - confidence: number between 0.0 and 1.0
+   - reason: concise explanation of why this category and action were chosen
+   - userConfirmationRequired: boolean (true if condition is ambiguous or confirmation needed)
+   - disposal: practical disposal or reuse guidance in India
+   - tip: practical eco-tip or circularity suggestion
+   - recyclable: boolean
+   - decompositionDays: number of days or null
+   - impactStat: one shocking or inspiring statistic about this item/material in India
+
+Respond ONLY with a valid JSON object matching these exact keys — no markdown, no backticks, no text outside JSON:
+{
+  "object": "name of object",
+  "itemName": "name of object",
+  "material": "materials",
+  "isWaste": false,
+  "condition": "usable",
+  "conditionConfidence": 0.85,
+  "category": "REUSABLE",
+  "action": "REUSE",
+  "disposalRoute": "Donate or resell",
+  "bin": null,
+  "confidence": 0.94,
+  "reason": "This is a furniture item rather than household waste.",
+  "userConfirmationRequired": false,
+  "disposal": "Keep in circular use through donation.",
+  "tip": "Clean and photograph for local community sharing.",
+  "recyclable": true,
+  "decompositionDays": null,
+  "impactStat": "Extending furniture life prevents massive landfill volume."
+}`
         }
       ]
     }],
-    generationConfig: { responseMimeType: "application/json", maxOutputTokens: 800 }
+    generationConfig: { responseMimeType: "application/json", maxOutputTokens: 900 }
   }),
 
   impact: (itemName, category) => ({
     contents: [{
       parts: [{
-        text: `Calculate the environmental impact of recycling "${itemName}" (${category} waste) instead of sending it to landfill.\nRespond ONLY with a valid JSON object — no markdown, no backticks:\n{\n  "carbonPercent": number (% reduction in carbon footprint, 1-95),\n  "carbonSaved": "short phrase like 'saves ~30g CO₂'",\n  "energySaved": "short phrase like 'powers a bulb for 3 hours'",\n  "waterSaved": "short phrase or null",\n  "wildlifeFact": "one vivid emotional sentence about how this helps a specific animal or ecosystem in India",\n  "funFact": "one surprising and delightful fact about recycling this material",\n  "treesEquivalent": "short phrase or null",\n  "recycledInto": "what this material commonly becomes after recycling"\n}`
+        text: `Calculate the environmental impact of recycling, reusing, or diverting "${itemName}" (${category}) instead of sending it to a landfill in India.\nRespond ONLY with a valid JSON object — no markdown, no backticks:\n{\n  "carbonPercent": number (% reduction in carbon footprint, 1-95),\n  "carbonSaved": "short phrase like 'saves ~30g CO₂' or 'saves ~25kg CO₂'",\n  "energySaved": "short phrase like 'powers a home for 1 day'",\n  "waterSaved": "short phrase or null",\n  "wildlifeFact": "one vivid emotional sentence about how diverting this helps animals or ecosystems in India",\n  "funFact": "one surprising and delightful fact about circular economy or recycling this material",\n  "treesEquivalent": "short phrase or null",\n  "recycledInto": "what this material becomes when reused or recycled"\n}`
       }]
     }],
     generationConfig: { responseMimeType: "application/json", maxOutputTokens: 600 }
@@ -34,6 +88,18 @@ const PROMPTS = {
       hazardous: "hazardous waste disposal center, battery recycling center, or municipal depot",
       ewaste: "e-waste collection center, authorized electronic scrap dealer, or recycling drop-off",
       sanitary: "municipal solid waste facility or sanitary waste processing depot",
+      WET_WASTE: "compost facility, bio-waste plant, or municipal organic waste collection center",
+      DRY_WASTE: "scrap dealer, kabadiwala, dry waste collection center, or recycling facility",
+      RECYCLABLE: "scrap dealer, kabadiwala, or dry waste recycling facility",
+      COMPOSTABLE: "compost facility, organic waste collection, or municipal bio-bin",
+      REUSABLE: "NGO donation center, second-hand market, thrift drop-off, or reuse charity (like Goonj)",
+      BULKY_WASTE: "municipal bulky waste collection center, furniture dismantler, or scrap depot",
+      E_WASTE: "authorized e-waste collection center, electronic recycler, or take-back point",
+      SPECIAL_CARE_WASTE: "hazardous waste facility, battery recycling kiosk, or pharmacy disposal",
+      TEXTILE: "cloth donation NGO (like Goonj), charity drive, or textile recycling center",
+      SANITARY_WASTE: "municipal solid waste incineration depot or disposal point",
+      GENERAL_WASTE: "municipal solid waste collection center",
+      UNKNOWN: "local municipal waste management depot or recycling center",
     };
 
     return {

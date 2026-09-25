@@ -11,6 +11,7 @@ import {
   syncSpendToSupabase,
   syncEarningToSupabase
 } from "./supabase";
+import { WASTE_STREAMS, validateWasteClassification } from "./wasteRules";
 
 // ─── Animated Go Logo ─────────────────────────────────────────────────────────
 const GO_TAGLINES = ["Go Green", "Go Clean", "Go Smart", "Go Local", "Go Zero", "Go Earth"];
@@ -102,20 +103,23 @@ const T = {
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const CATS = {
+  ...WASTE_STREAMS,
   wet:       { color:"#4ade80", darkColor:"#16a34a", bg:"#052e16", label:"Wet Waste",    emoji:"🟢", bin:"Green Bin",      points:10 },
   dry:       { color:"#60a5fa", darkColor:"#2563eb", bg:"#0c1a2e", label:"Dry Waste",    emoji:"🔵", bin:"Blue Bin",       points:15 },
-  hazardous: { color:"#f87171", darkColor:"#dc2626", bg:"#2d0a0a", label:"Hazardous",    emoji:"🔴", bin:"Red Bin",        points:25 },
-  ewaste:    { color:"#c084fc", darkColor:"#7c3aed", bg:"#1a0a2e", label:"E-Waste",      emoji:"🟣", bin:"E-Waste Center", points:30 },
-  sanitary:  { color:"#fb923c", darkColor:"#ea580c", bg:"#2d1200", label:"Sanitary",     emoji:"🟠", bin:"Black Bin",      points:10 },
+  hazardous: { color:"#f87171", darkColor:"#dc2626", bg:"#2d0a0a", label:"Special Care", emoji:"⚠️", bin:null,             points:25 },
+  ewaste:    { color:"#c084fc", darkColor:"#7c3aed", bg:"#1a0a2e", label:"E-Waste",      emoji:"💻", bin:null,             points:30 },
+  sanitary:  { color:"#fb7185", darkColor:"#e11d48", bg:"#2e0814", label:"Sanitary",     emoji:"🧤", bin:"Black Bin",      points:10 },
 };
 const BADGES = [
-  { id:"first",  icon:"🌱", name:"First Scan",    desc:"Scanned your first item",           req:1  },
-  { id:"eco5",   icon:"🌿", name:"Eco Starter",   desc:"Scanned 5 items",                   req:5  },
-  { id:"green10",icon:"🌳", name:"Green Hero",    desc:"Scanned 10 items",                  req:10 },
-  { id:"pts50",  icon:"⚡", name:"Eco Spark",     desc:"Earned 50 EcoCoins",                req:50,  type:"points" },
-  { id:"pts100", icon:"🔥", name:"EcoWarrior",    desc:"Earned 100 EcoCoins",               req:100, type:"points" },
-  { id:"hazard", icon:"🛡️", name:"Safety First",  desc:"Handled hazardous waste correctly", cat:"hazardous" },
-  { id:"etech",  icon:"💻", name:"Tech Recycler", desc:"Disposed e-waste properly",         cat:"ewaste" },
+  { id:"first",  icon:"🌱", name:"First Scan",         desc:"Scanned your first item",           req:1  },
+  { id:"eco5",   icon:"🌿", name:"Eco Starter",        desc:"Scanned 5 items",                   req:5  },
+  { id:"green10",icon:"🌳", name:"Green Hero",         desc:"Scanned 10 items",                  req:10 },
+  { id:"pts50",  icon:"⚡", name:"Eco Spark",          desc:"Earned 50 EcoCoins",                req:50,  type:"points" },
+  { id:"pts100", icon:"🔥", name:"EcoWarrior",         desc:"Earned 100 EcoCoins",               req:100, type:"points" },
+  { id:"hazard", icon:"🛡️", name:"Safety First",       desc:"Handled hazardous waste correctly", cat:"hazardous", altCat:"SPECIAL_CARE_WASTE" },
+  { id:"etech",  icon:"💻", name:"Tech Recycler",      desc:"Disposed e-waste properly",         cat:"ewaste",    altCat:"E_WASTE" },
+  { id:"reuse",  icon:"🔄", name:"Circular Champion",  desc:"Reused or donated an item",         cat:"REUSABLE" },
+  { id:"bulky",  icon:"🛋️", name:"Bulky Handler",      desc:"Managed bulky waste responsibly",   cat:"BULKY_WASTE" },
 ];
 const REWARDS = [
   // Free tier
@@ -407,7 +411,7 @@ function AuthPage({onLogin, isDark, toggleDark}) {
           onLogin(userObj);
         } else {
           const user=ls.get(`ww_user_${u}`,null);
-          if(!user){setErr("Account not found. Create one first or configure Supabase.");setLoading(false);return;}
+          if(!user){setErr("Account not found.");setLoading(false);return;}
           onLogin(user);
         }
       } catch(e) {
@@ -477,12 +481,6 @@ function AuthPage({onLogin, isDark, toggleDark}) {
             <button className="ww-btn-green" onClick={submit} disabled={loading} style={{padding:"15px",background:loading?t.bgCard:`linear-gradient(135deg,${t.greenDeep},${t.green})`,border:`1px solid ${t.borderGreen}`,borderRadius:14,cursor:loading?"not-allowed":"pointer",color:loading?t.textMid:isDark?"#030a03":"#fff",fontSize:15,fontWeight:700,fontFamily:"'Outfit',sans-serif",display:"flex",alignItems:"center",justifyContent:"center",gap:8,marginTop:4}}>
               {loading?<><Spinner color={t.green}/>Processing...</>:mode==="login"?"🌱 Welcome Back":"🚀 Join the Movement"}
             </button>
-            <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:6,marginTop:6}}>
-              <span style={{width:7,height:7,borderRadius:"50%",background:isSupabaseConfigured?"#22c55e":"#f59e0b",display:"inline-block"}}/>
-              <span style={{fontSize:11,color:t.textDim,fontFamily:"'Outfit',sans-serif"}}>
-                {isSupabaseConfigured ? "Supabase Cloud Auth Active" : "Local mode (add Supabase credentials in .env)"}
-              </span>
-            </div>
           </div>
         </Card>
       </div>
@@ -497,6 +495,7 @@ function ScannerPage({user, onScanComplete, t, isDark}) {
   const [image,setImage]=useState(null);
   const [imgB64,setImgB64]=useState(null);
   const [result,setResult]=useState(null);
+  const [rawResult,setRawResult]=useState(null);
   const [loading,setLoading]=useState(false);
   const [error,setError]=useState(null);
   const [dragOver,setDragOver]=useState(false);
@@ -587,17 +586,30 @@ function ScannerPage({user, onScanComplete, t, isDark}) {
 
   const analyzeWaste=async()=>{
     if(!imgB64) return;
-    setLoading(true);setError(null);setResult(null);setImpact(null);setCenters(null);
+    setLoading(true);setError(null);setResult(null);setRawResult(null);setImpact(null);setCenters(null);
     try {
       const data = await callAI({
         type: "analyze",
         imageB64: imgB64,
       });
-      setResult(data);
-      fetchImpact(data.itemName, data.category, data);
-      findCenters(data.category, data.itemName);
+      setRawResult(data);
+      const validated = validateWasteClassification(data);
+      setResult(validated);
+      fetchImpact(validated.itemName, validated.category, validated);
+      findCenters(validated.category, validated.itemName);
     } catch (err) { setError(err.message || "Could not analyze. Try a clearer photo."); }
     finally { setLoading(false); }
+  };
+
+  const handleConditionChange=(newCondition)=>{
+    if(!rawResult && !result) return;
+    const base = rawResult || result;
+    const updated = validateWasteClassification(base, newCondition);
+    setResult(updated);
+    if(updated.category !== result?.category) {
+      fetchImpact(updated.itemName, updated.category, updated);
+      findCenters(updated.category, updated.itemName);
+    }
   };
 
   const fetchImpact=async(itemName,category,scanResult)=>{
@@ -646,9 +658,15 @@ function ScannerPage({user, onScanComplete, t, isDark}) {
     finally { setCentersLoading(false); }
   };
 
-  const reset=()=>{stopCamera();setInputMode("upload");setImage(null);setImgB64(null);setResult(null);setImpact(null);setError(null);setCenters(null);setCentersError(null);setUserCity(null);setCustomCityInput("");};
-  const cat=result?CATS[result.category]:null;
+  const reset=()=>{stopCamera();setInputMode("upload");setImage(null);setImgB64(null);setResult(null);setRawResult(null);setImpact(null);setError(null);setCenters(null);setCentersError(null);setUserCity(null);setCustomCityInput("");};
+  const cat=result?(CATS[result.category]||WASTE_STREAMS[result.category]||CATS.dry):null;
   const catColor = cat ? (isDark ? cat.color : cat.darkColor) : t.green;
+  const confPct = result ? Math.round(result.confidence <= 1 ? result.confidence * 100 : result.confidence) : 0;
+  const confLevel = confPct >= 80
+    ? { label: "High Confidence", color: t.green }
+    : confPct >= 50
+    ? { label: "Moderate Confidence", color: t.yellow }
+    : { label: "Low Confidence — verify details", color: t.red };
 
   return (
     <div style={{paddingBottom:20}}>
@@ -725,34 +743,187 @@ function ScannerPage({user, onScanComplete, t, isDark}) {
         <div style={{marginTop:18,animation:"ww-slideup .5s ease"}}>
           {/* Category hero */}
           <div style={{background:`linear-gradient(135deg,${isDark?cat.bg:"#f0fdf4"},${isDark?"rgba(5,13,5,.98)":"#dcfce7"})`,border:`1.5px solid ${catColor}30`,borderRadius:24,padding:"20px",boxShadow:`0 12px 40px ${catColor}20`,marginBottom:12}}>
-            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}}>
+            {/* Header: Object name & material + category & waste status */}
+            <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:12,marginBottom:14}}>
+              <div style={{flex: 1}}>
+                <div style={{fontSize:10,color:t.textDim,letterSpacing:2.5,textTransform:"uppercase",marginBottom:4,fontFamily:"'Outfit',sans-serif",fontWeight:600}}>
+                  Identified Object
+                </div>
+                <div style={{fontFamily:"'Fraunces',serif",fontSize:24,fontWeight:900,color:t.text,lineHeight:1.15}}>
+                  {result.object || result.itemName}
+                </div>
+                {result.material && (
+                  <div style={{fontSize:12,color:t.textMid,fontFamily:"'Outfit',sans-serif",marginTop:4}}>
+                    Material: <span style={{color:t.text,fontWeight:600}}>{result.material}</span>
+                  </div>
+                )}
+              </div>
+
+              <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:6}}>
+                <div style={{padding:"8px 14px",borderRadius:40,background:`${catColor}20`,border:`1.5px solid ${catColor}50`,color:catColor,fontWeight:700,fontSize:13,fontFamily:"'Outfit',sans-serif",display:"flex",alignItems:"center",gap:6,whiteSpace:"nowrap"}}>
+                  <span>{cat.emoji}</span> <span>{cat.shortLabel || cat.label}</span>
+                </div>
+                {!result.isWaste && (
+                  <span style={{padding:"4px 10px",borderRadius:20,background:isDark?"rgba(74,222,128,.18)":"rgba(22,163,74,.15)",border:`1px solid ${t.green}50`,color:t.green,fontWeight:700,fontSize:11,fontFamily:"'Outfit',sans-serif",letterSpacing:.5}}>
+                    ✨ NOT WASTE
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Recommended Action & Condition Banner */}
+            <div style={{
+              padding:"12px 14px",
+              borderRadius:16,
+              background:isDark?"rgba(0,0,0,.35)":"rgba(255,255,255,.7)",
+              border:`1px solid ${catColor}25`,
+              backdropFilter:"blur(8px)",
+              display:"flex",
+              alignItems:"center",
+              justifyContent:"space-between",
+              gap:10,
+              flexWrap:"wrap",
+              marginBottom:14
+            }}>
               <div>
-                <div style={{fontSize:10,color:t.textDim,letterSpacing:2.5,textTransform:"uppercase",marginBottom:4,fontFamily:"'Outfit',sans-serif",fontWeight:600}}>Identified As</div>
-                <div style={{fontFamily:"'Fraunces',serif",fontSize:24,fontWeight:900,color:t.text,lineHeight:1.1}}>{result.itemName}</div>
+                <div style={{fontSize:9,color:t.textDim,letterSpacing:1.8,fontWeight:700,textTransform:"uppercase",marginBottom:2,fontFamily:"'Outfit',sans-serif"}}>
+                  RECOMMENDED ACTION
+                </div>
+                <div style={{color:catColor,fontWeight:800,fontSize:15,fontFamily:"'Outfit',sans-serif",display:"flex",alignItems:"center",gap:6}}>
+                  <span>{cat.emoji}</span>
+                  <span>{cat.actionLabel || result.action}</span>
+                </div>
               </div>
-              <div style={{padding:"8px 14px",borderRadius:40,background:`${catColor}20`,border:`1.5px solid ${catColor}50`,color:catColor,fontWeight:700,fontSize:13,fontFamily:"'Outfit',sans-serif"}}>
-                {cat.emoji} {cat.label}
-              </div>
+              {result.condition && (
+                <div style={{
+                  fontSize:11,
+                  fontWeight:700,
+                  padding:"5px 11px",
+                  borderRadius:12,
+                  fontFamily:"'Outfit',sans-serif",
+                  background:result.condition === "usable" ? (isDark ? "rgba(74,222,128,.2)" : "rgba(22,163,74,.15)") : result.condition === "damaged" ? (isDark ? "rgba(248,113,113,.2)" : "rgba(220,38,38,.12)") : (isDark ? "rgba(251,191,36,.2)" : "rgba(217,119,6,.15)"),
+                  color:result.condition === "usable" ? t.green : result.condition === "damaged" ? t.red : t.yellow,
+                  border:`1px solid ${result.condition === "usable" ? t.green : result.condition === "damaged" ? t.red : t.yellow}40`,
+                  textTransform:"uppercase",
+                  letterSpacing:.5,
+                }}>
+                  Condition: {result.condition}
+                </div>
+              )}
             </div>
-            {/* Confidence */}
+
+            {/* AI Confidence Meter with Level */}
             <div style={{marginBottom:14}}>
-              <div style={{display:"flex",justifyContent:"space-between",fontSize:10,color:t.textDim,marginBottom:6,fontFamily:"'Outfit',sans-serif",fontWeight:600,letterSpacing:1}}><span>AI CONFIDENCE</span><span style={{color:catColor}}>{result.confidence}%</span></div>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",fontSize:10,color:t.textDim,marginBottom:6,fontFamily:"'Outfit',sans-serif",fontWeight:600,letterSpacing:1}}>
+                <span>AI CONFIDENCE</span>
+                <div style={{display:"flex",alignItems:"center",gap:6}}>
+                  <span style={{color:confLevel.color,fontWeight:700,fontSize:11}}>{confLevel.label}</span>
+                  <span style={{color:catColor,fontWeight:700}}>({confPct}%)</span>
+                </div>
+              </div>
               <div style={{height:6,background:isDark?"rgba(255,255,255,.06)":"rgba(0,0,0,.08)",borderRadius:3,overflow:"hidden"}}>
-                <div style={{height:"100%",width:`${result.confidence}%`,background:`linear-gradient(90deg,${catColor}80,${catColor})`,borderRadius:3,transition:"width 1.2s cubic-bezier(.4,0,.2,1)",boxShadow:`0 0 8px ${catColor}60`}}/>
+                <div style={{height:"100%",width:`${confPct}%`,background:`linear-gradient(90deg,${confLevel.color}80,${confLevel.color})`,borderRadius:3,transition:"width 1.2s cubic-bezier(.4,0,.2,1)",boxShadow:`0 0 8px ${confLevel.color}60`}}/>
               </div>
             </div>
-            {/* Bin */}
-            <div style={{display:"flex",alignItems:"center",gap:12,padding:"13px 15px",background:isDark?"rgba(0,0,0,.3)":"rgba(255,255,255,.6)",borderRadius:14,border:`1px solid ${catColor}20`,backdropFilter:"blur(8px)"}}>
-              <span style={{fontSize:24}}>🗑️</span>
-              <div><div style={{fontSize:10,color:t.textDim,letterSpacing:1.5,fontFamily:"'Outfit',sans-serif",fontWeight:600}}>THROW IN</div><div style={{color:catColor,fontWeight:700,fontSize:15,fontFamily:"'Outfit',sans-serif"}}>{cat.bin}</div></div>
-              {result.recyclable&&<div style={{marginLeft:"auto",background:`${t.green}20`,border:`1px solid ${t.green}40`,borderRadius:30,padding:"4px 12px",fontSize:11,color:t.green,fontWeight:700,fontFamily:"'Outfit',sans-serif"}}>♻️ RECYCLABLE</div>}
-            </div>
+
+            {/* Why / Explanation */}
+            {result.reason && (
+              <div style={{
+                marginBottom:14,
+                padding:"10px 14px",
+                borderRadius:12,
+                background:isDark?"rgba(0,0,0,.25)":"rgba(255,255,255,.5)",
+                borderLeft:`3.5px solid ${catColor}`,
+                fontSize:12,
+                color:t.textMid,
+                lineHeight:1.6,
+                fontFamily:"'Outfit',sans-serif"
+              }}>
+                <strong style={{color:t.text}}>💡 Why: </strong>{result.reason}
+              </div>
+            )}
+
+            {/* Interactive Condition Confirmation (when applicable or required) */}
+            {(result.userConfirmationRequired || ["REUSABLE", "BULKY_WASTE", "TEXTILE"].includes(result.category) || result.condition === "unknown") && (
+              <div style={{
+                marginBottom:14,
+                padding:"12px 14px",
+                borderRadius:16,
+                background:isDark?"rgba(251,191,36,.06)":"rgba(245,158,11,.08)",
+                border:`1.5px dashed ${t.yellow}60`,
+              }}>
+                <div style={{fontSize:11,fontWeight:700,color:t.yellow,letterSpacing:1,textTransform:"uppercase",marginBottom:4,fontFamily:"'Outfit',sans-serif"}}>
+                  🤔 Confirm Item Usability
+                </div>
+                <p style={{fontSize:12,color:t.textMid,margin:"0 0 8px 0",lineHeight:1.45,fontFamily:"'Outfit',sans-serif"}}>
+                  Is this item still working and usable? Changing this updates whether it should be reused/donated or scheduled for bulky disposal.
+                </p>
+                <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                  {[
+                    { id:"usable", label:"✅ Usable / Working" },
+                    { id:"damaged", label:"❌ Broken / Damaged" },
+                    { id:"unknown", label:"❓ Not Sure" },
+                  ].map(c=>(
+                    <button
+                      key={c.id}
+                      onClick={()=>handleConditionChange(c.id)}
+                      style={{
+                        flex:1,
+                        minWidth:95,
+                        padding:"8px 10px",
+                        borderRadius:10,
+                        border:result.condition === c.id ? `1.5px solid ${t.green}` : `1px solid ${t.border}`,
+                        background:result.condition === c.id ? (isDark ? "rgba(74,222,128,.22)" : "rgba(22,163,74,.18)") : (isDark ? "rgba(255,255,255,.05)" : "rgba(255,255,255,.7)"),
+                        color:result.condition === c.id ? t.green : t.text,
+                        fontSize:11,
+                        fontWeight:700,
+                        fontFamily:"'Outfit',sans-serif",
+                        cursor:"pointer",
+                        transition:"all .2s",
+                      }}
+                    >
+                      {c.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Disposal Route / Bin Recommendation */}
+            {result.bin ? (
+              <div style={{display:"flex",alignItems:"center",gap:12,padding:"13px 15px",background:isDark?"rgba(0,0,0,.35)":"rgba(255,255,255,.7)",borderRadius:16,border:`1px solid ${catColor}25`,backdropFilter:"blur(8px)"}}>
+                <span style={{fontSize:26}}>🗑️</span>
+                <div style={{flex:1}}>
+                  <div style={{fontSize:10,color:t.textDim,letterSpacing:1.5,fontFamily:"'Outfit',sans-serif",fontWeight:600}}>THROW IN</div>
+                  <div style={{color:catColor,fontWeight:700,fontSize:15,fontFamily:"'Outfit',sans-serif"}}>{result.bin}</div>
+                </div>
+                {result.recyclable&&<div style={{marginLeft:"auto",background:`${t.green}20`,border:`1px solid ${t.green}40`,borderRadius:30,padding:"4px 12px",fontSize:11,color:t.green,fontWeight:700,fontFamily:"'Outfit',sans-serif"}}>♻️ RECYCLABLE</div>}
+              </div>
+            ) : (
+              <div style={{display:"flex",alignItems:"flex-start",gap:12,padding:"14px 16px",background:isDark?"rgba(0,0,0,.35)":"rgba(255,255,255,.7)",borderRadius:16,border:`1px solid ${catColor}25`,backdropFilter:"blur(8px)"}}>
+                <span style={{fontSize:26,lineHeight:1}}>
+                  {result.action === "REUSE" ? "🔄" : result.action === "BULKY_WASTE" ? "🛋️" : result.action === "SPECIAL_DISPOSAL" ? "⚠️" : result.action === "COMPOST" ? "🌱" : "🚚"}
+                </span>
+                <div style={{flex:1}}>
+                  <div style={{fontSize:10,color:t.textDim,letterSpacing:1.5,fontFamily:"'Outfit',sans-serif",fontWeight:600}}>
+                    DISPOSAL / CIRCULAR ROUTE
+                  </div>
+                  <div style={{color:catColor,fontWeight:700,fontSize:14,fontFamily:"'Outfit',sans-serif",lineHeight:1.45,marginTop:3}}>
+                    {result.disposalRoute || "Follow local municipality guidelines"}
+                  </div>
+                  <div style={{fontSize:11,color:t.textDim,marginTop:5,fontFamily:"'Outfit',sans-serif"}}>
+                    🚫 Do not discard in ordinary household bins.
+                  </div>
+                </div>
+                {result.recyclable&&<div style={{marginLeft:"auto",background:`${t.green}20`,border:`1px solid ${t.green}40`,borderRadius:30,padding:"4px 12px",fontSize:11,color:t.green,fontWeight:700,fontFamily:"'Outfit',sans-serif",alignSelf:"center"}}>♻️ RECYCLABLE</div>}
+              </div>
+            )}
           </div>
 
           {/* Impact panel */}
           <Card t={t} style={{padding:"20px",borderRadius:24,marginBottom:12,border:`1.5px solid ${t.borderGreen}`}}>
             <div style={{fontSize:11,color:t.green,letterSpacing:2,marginBottom:14,fontWeight:700,fontFamily:"'Outfit',sans-serif",display:"flex",alignItems:"center",gap:8}}>
-              🌍 IF YOU RECYCLE THIS...
+              {result.isWaste ? "🌍 IF YOU RECYCLE / DISPOSE RESPONSIBLY..." : "🌍 IF YOU REUSE / DONATE THIS..."}
             </div>
             {impactLoading&&<div style={{display:"flex",alignItems:"center",gap:10,color:t.textMid,fontSize:13,fontFamily:"'Outfit',sans-serif"}}><Spinner color={t.green} size={14}/>Calculating your planet impact...</div>}
             {impact&&(
@@ -818,7 +989,7 @@ function ScannerPage({user, onScanComplete, t, isDark}) {
               <div style={{display:"flex",flexDirection:"column",gap:8}}>
                 <button className="ww-btn-green" onClick={()=>findCenters(result.category,result.itemName)}
                   style={{width:"100%",padding:"14px",background:isDark?"rgba(96,165,250,.12)":"rgba(37,99,235,.08)",border:`1px solid ${t.blue}40`,borderRadius:16,cursor:"pointer",color:t.blue,fontSize:14,fontWeight:700,fontFamily:"'Outfit',sans-serif",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
-                  📍 Detect GPS Location & Find Centers
+                  {result.isWaste ? "📍 Detect GPS Location & Find Disposal Centers" : "📍 Detect GPS Location & Find Donation / Drop-off Centers"}
                 </button>
                 <div style={{display:"flex",gap:6,alignItems:"center"}}>
                   <input value={customCityInput} onChange={e=>setCustomCityInput(e.target.value)} placeholder="or type city/area (e.g. Malviya Nagar, Jaipur)..."
@@ -1053,7 +1224,7 @@ function DashboardPage({user, t, isDark}) {
             </div>
           </Card>
           <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:12}}>
-            {Object.entries(CATS).map(([k,v])=>(
+            {Object.entries(CATS).filter(([k]) => !["wet", "dry", "hazardous", "ewaste", "sanitary", "UNKNOWN"].includes(k)).map(([k,v])=>(
               <div key={k} style={{display:"flex",alignItems:"center",gap:5,fontSize:11,color:t.textDim,fontFamily:"'Outfit',sans-serif"}}>
                 <div style={{width:8,height:8,borderRadius:"50%",background:isDark?v.color:v.darkColor}}/>{v.label}
               </div>
@@ -1832,7 +2003,7 @@ export default function App() {
       if (badges.includes(b.id)) continue;
       if (b.type === "points" && pts >= b.req) { badges.push(b.id); unlocked = b; break; }
       if (!b.type && !b.cat && scans >= b.req) { badges.push(b.id); unlocked = b; break; }
-      if (b.cat && b.cat === scanData.category) { badges.push(b.id); unlocked = b; break; }
+      if (b.cat && (b.cat === scanData.category || b.altCat === scanData.category)) { badges.push(b.id); unlocked = b; break; }
     }
     ls.set(`ww_badges_${user.email}`, badges);
     if (unlocked) { setNewBadge(unlocked); setTimeout(() => setNewBadge(null), 4500); }
