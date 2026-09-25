@@ -1497,7 +1497,7 @@ function ScannerPage({user, onScanComplete, t, isDark}) {
 // ═══════════════════════════════════════════════════════════════════════════════
 //  DASHBOARD PAGE
 // ═══════════════════════════════════════════════════════════════════════════════
-function DashboardPage({user, t, isDark}) {
+function DashboardPage({user, t, isDark, onResetCoins}) {
   const [dash,setDash]=useState("overview");
   const history=ls.get(`ww_history_${user.email}`,[]);
   const totalPts=ls.get(`ww_pts_${user.email}`,0);
@@ -1549,6 +1549,11 @@ function DashboardPage({user, t, isDark}) {
               <div style={{textAlign:"right"}}>
                 <div style={{fontSize:10,color:isDark?"#fbbf24":"#d97706",letterSpacing:2,marginBottom:4,fontFamily:"'Outfit',sans-serif",fontWeight:600}}>ECOCOINS</div>
                 <div style={{fontFamily:"'Fraunces',serif",fontSize:32,fontWeight:900,color:isDark?"#fbbf24":"#d97706"}}>🪙 {totalPts}</div>
+                {onResetCoins && totalPts > 0 && (
+                  <button onClick={onResetCoins} title="Reset EcoCoins to 0" style={{background:"transparent",border:"none",color:t.textDim,fontSize:10,cursor:"pointer",textDecoration:"underline",fontFamily:"'Outfit',sans-serif",padding:0,marginTop:2}}>
+                    Reset to 0
+                  </button>
+                )}
               </div>
             </div>
             <div style={{fontSize:10,color:t.textDim,display:"flex",justifyContent:"space-between",marginBottom:6,fontFamily:"'Outfit',sans-serif",fontWeight:600}}><span>NEXT LEVEL IN {50-(totalPts%50)} COINS</span><span style={{color:t.green}}>{Math.round(lvlProg)}%</span></div>
@@ -2455,6 +2460,19 @@ export default function App() {
     }
   }, [user]);
 
+  const handleResetEcoCoins = useCallback(async () => {
+    if (!user) return;
+    ls.set(`ww_pts_${user.email}`, 0);
+    setTotalPts(0);
+    if (isSupabaseConfigured && user.id && supabase) {
+      try {
+        await supabase.from("profiles").update({ eco_coins: 0, updated_at: new Date().toISOString() }).eq("id", user.id);
+      } catch (e) {
+        console.warn("Failed to reset Supabase coins:", e);
+      }
+    }
+  }, [user]);
+
   if(!user) return <AuthPage onLogin={handleLogin} isDark={isDark} toggleDark={toggleDark}/>;
 
   const leaves=[[{top:"12%",left:"1%"},0],[{top:"25%",right:"2%"},1],[{bottom:"30%",left:"0%"},2],[{bottom:"15%",right:"3%"},0],[{top:"55%",left:"2%"},1]];
@@ -2553,7 +2571,12 @@ export default function App() {
                 <div style={{fontSize:11,color:t.textDim,fontFamily:"'Outfit',sans-serif"}}>{s.label}</div>
               </div>
             ))}
-            <button onClick={()=>setShowSignOut(true)} style={{width:"100%",marginTop:8,padding:"9px",borderRadius:10,background:"transparent",border:`1px solid ${t.red}25`,color:t.red,cursor:"pointer",fontSize:12,fontWeight:600,fontFamily:"'Outfit',sans-serif"}}>👋 Sign Out</button>
+            {totalPts > 0 && (
+              <button onClick={handleResetEcoCoins} title="Reset EcoCoins to 0 for testing" style={{background:"transparent",border:"none",color:t.textDim,fontSize:10,cursor:"pointer",textDecoration:"underline",fontFamily:"'Outfit',sans-serif",padding:0,marginBottom:8,display:"block"}}>
+                ↺ Reset EcoCoins to 0
+              </button>
+            )}
+            <button onClick={()=>setShowSignOut(true)} style={{width:"100%",marginTop:4,padding:"9px",borderRadius:10,background:"transparent",border:`1px solid ${t.red}25`,color:t.red,cursor:"pointer",fontSize:12,fontWeight:600,fontFamily:"'Outfit',sans-serif"}}>👋 Sign Out</button>
           </div>
         </div>
 
@@ -2563,7 +2586,7 @@ export default function App() {
           {page==="earnings" && <EarningsPage user={user} t={t} isDark={isDark} onEarnEcoCoins={handleEarnEcoCoins}/>}
           {page==="rewards"  && <RewardsPage  user={user} t={t} isDark={isDark} totalPts={totalPts} onSpend={handleSpend}/>}
           {page==="sdg"      && <SDGPage t={t} isDark={isDark}/>}
-          {page==="dashboard"&& <DashboardPage user={user} t={t} isDark={isDark}/>}
+          {page==="dashboard"&& <DashboardPage user={user} t={t} isDark={isDark} onResetCoins={handleResetEcoCoins}/>}
           <p style={{textAlign:"center",color:t.textDim,fontSize:11,marginTop:32,letterSpacing:1.5,fontFamily:"'Outfit',sans-serif"}}>GO · INDIA 🌍</p>
         </div>
 
