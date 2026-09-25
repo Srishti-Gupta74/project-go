@@ -29,17 +29,46 @@ const PROMPTS = {
 
   centers: (itemName, category, city) => {
     const searchHints = {
-      wet: "compost facility or organic waste collection",
-      dry: "scrap dealer or kabadiwala or recycling center",
-      hazardous: "hazardous waste disposal facility",
-      ewaste: "e-waste collection or electronics recycling center",
-      sanitary: "municipal solid waste collection point",
+      wet: "compost facility, bio-waste plant, or municipal organic waste collection center",
+      dry: "scrap dealer, kabadiwala, dry waste collection center, or recycling facility",
+      hazardous: "hazardous waste disposal center, battery recycling center, or municipal depot",
+      ewaste: "e-waste collection center, authorized electronic scrap dealer, or recycling drop-off",
+      sanitary: "municipal solid waste facility or sanitary waste processing depot",
     };
 
     return {
       contents: [{
         parts: [{
-          text: `Find up to 3 REAL, VERIFIED recycling or waste disposal facilities for "${itemName}" (${category} waste) near "${city}", India.\nCRITICAL ZERO-HALLUCINATION RULES:\n1. ONLY list real, verified, major recycling organizations, verified municipal waste management centers, or authentic, widely known scrap dealers actually present on Google Maps in "${city}" or its nearest main city (e.g. Ranchi).\n2. DO NOT under any circumstances generate common/generic fabricated names like "Shri Ram Kabadi", "A1 Scrap Dealer", "Green Earth Recycling", or "Bariatu Kabadiwala". If you do not have exact, verified knowledge of real named stores specifically indexed on Google Maps in "${city}" or nearest main city, YOU MUST RETURN AN EMPTY ARRAY [].\n3. It is 1000x BETTER to return [] (empty array) than to return even ONE unverified or hallucinated store name.\nLook for: ${searchHints[category] || "recycling center"}.\nRespond ONLY with a valid JSON array — no markdown, no backticks:\n[\n  {\n    "name": "REAL 100% verified facility name",\n    "type": "type of facility",\n    "address": "REAL verifiable address with area and city name",\n    "distance": "approximate distance from ${city}",\n    "phone": "verified phone number or null",\n    "hours": "verified opening hours or null",\n    "tip": "one helpful tip for visiting or calling",\n    "mapsQuery": "exact real business name and city query for Google Maps"\n  }\n]\nIf you are not 100% sure that the exact business name exists right now on Google Maps in "${city}" or nearest main city, return [] immediately.`
+          text: `You are an expert Indian waste management and local recycling locator assistant.
+Find the top 3 nearest authentic recycling centers, scrap dealers (kabadiwalas), or waste disposal facilities for "${itemName}" (${category} waste) serving "${city}", India.
+
+CRITICAL INSTRUCTIONS:
+1. ALWAYS return exactly 3 top facilities or dealers. Never return an empty array or fewer than 3 items.
+2. Search in and around "${city}". If "${city}" is a specific neighborhood, colony, suburb, or small locality, automatically expand outward to the nearest major city, municipal corporation, or district hub (e.g. if "${city}" is in or near Jaipur, find the top 3 authentic centers in Jaipur and surrounding district) so the user always receives the nearest available options.
+3. Every center must be appropriate for ${category} waste (${searchHints[category] || "recycling center"}).
+4. Provide realistic, helpful details for each entry:
+   - "name": Official or authentic name of the scrap dealer, kabadiwala, recycling center, or municipal facility.
+   - "type": e.g. "Scrap Dealer / Kabadiwala", "Recycling Center", "Municipal Collection Point", "E-Waste Depot".
+   - "address": Locality/area and city in India (e.g. "Mansarovar, Jaipur, Rajasthan").
+   - "distance": Realistic approximate distance from "${city}" (e.g. "~1.5 km", "~3.2 km", "~5.0 km").
+   - "phone": Valid phone number format or null if not publicly available.
+   - "hours": Operating hours (e.g. "9:00 AM - 7:00 PM") or null.
+   - "tip": Helpful tip for visiting or selling scrap (e.g. "Accepts bulk scrap and clean recyclables").
+   - "mapsQuery": Exact search term for Google Maps (e.g. "[Business Name] [Area] [City]").
+
+Respond ONLY with a valid JSON array of 3 objects — no markdown formatting, no backticks, no explanations:
+[
+  {
+    "name": "...",
+    "type": "...",
+    "address": "...",
+    "distance": "...",
+    "phone": "...",
+    "hours": "...",
+    "tip": "...",
+    "mapsQuery": "..."
+  }
+]`
         }]
       }],
       generationConfig: { responseMimeType: "application/json", maxOutputTokens: 800 }

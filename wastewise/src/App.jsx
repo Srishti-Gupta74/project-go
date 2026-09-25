@@ -561,6 +561,7 @@ function ScannerPage({user, onScanComplete, t, isDark}) {
       });
       setResult(data);
       fetchImpact(data.itemName, data.category, data);
+      findCenters(data.category, data.itemName);
     } catch (err) { setError(err.message || "Could not analyze. Try a clearer photo."); }
     finally { setLoading(false); }
   };
@@ -580,13 +581,13 @@ function ScannerPage({user, onScanComplete, t, isDark}) {
 
   const findCenters=async(category,itemName,manualCity=null)=>{
     setCentersLoading(true);setCentersError(null);setCenters(null);
-    let city = manualCity || (customCityInput.trim() ? customCityInput.trim() : null) || userCity || "India";
-    if (!manualCity && !customCityInput.trim() && !userCity) {
+    let city = manualCity || (customCityInput.trim() ? customCityInput.trim() : null) || userCity || null;
+    if (!city) {
       try {
         const getPos = (opts) => new Promise((res,rej)=>navigator.geolocation.getCurrentPosition(res,rej,opts));
         let pos;
-        try { pos = await getPos({timeout:8000,enableHighAccuracy:true}); }
-        catch { pos = await getPos({timeout:5000,enableHighAccuracy:false}); }
+        try { pos = await getPos({timeout:6000,enableHighAccuracy:true}); }
+        catch { pos = await getPos({timeout:4000,enableHighAccuracy:false}); }
         const geo = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${pos.coords.latitude}&lon=${pos.coords.longitude}&format=json`);
         const d = await geo.json();
         const addr = d?.address || {};
@@ -828,10 +829,10 @@ function ScannerPage({user, onScanComplete, t, isDark}) {
                 </div>
                 {centers.length===0?(
                   <Card t={t} style={{padding:"20px",borderRadius:18,border:`1px solid ${t.blue}25`,textAlign:"center"}}>
-                    <div style={{fontSize:28,marginBottom:8}}>🛡️</div>
-                    <div style={{fontFamily:"'Fraunces',serif",fontSize:16,fontWeight:800,color:t.text,marginBottom:8}}>Strict Zero-Hallucination Active</div>
+                    <div style={{fontSize:26,marginBottom:8}}>📍</div>
+                    <div style={{fontFamily:"'Fraunces',serif",fontSize:16,fontWeight:800,color:t.text,marginBottom:6}}>Find Nearest Centers near {(userCity||"Your Area").split(',')[0]}</div>
                     <p style={{fontSize:13,color:t.textMid,margin:"0 0 16px 0",fontFamily:"'Outfit',sans-serif",lineHeight:1.6}}>
-                      To protect you from fake store names, the AI strictly lists only 100% verified businesses. We couldn't verify a guaranteed named kabadiwala specifically inside <b>{userCity||"your exact area"}</b> in our database right now.
+                      Explore verified local scrap dealers and recycling collection points on Google Maps:
                     </p>
                     <div style={{display:"flex",flexDirection:"column",gap:8,alignItems:"center",maxWidth:400,margin:"0 auto"}}>
                       <a href={`https://www.google.com/maps/search/${encodeURIComponent('kabadiwala scrap dealer near '+(userCity||''))}`} target="_blank" rel="noopener noreferrer"
