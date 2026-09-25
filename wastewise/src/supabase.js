@@ -197,7 +197,7 @@ export async function syncSpendToSupabase(userId, newPts, rewardId, cost) {
   }
 }
 
-export async function syncEarningToSupabase(userId, logData) {
+export async function syncEarningToSupabase(userId, logData, newTotalPts) {
   if (!supabase || !userId) return;
   try {
     await supabase.from("earnings").insert({
@@ -209,6 +209,13 @@ export async function syncEarningToSupabase(userId, logData) {
       items: logData.items || [],
       created_at: new Date().toISOString(),
     });
+
+    if (newTotalPts !== undefined && newTotalPts !== null) {
+      await supabase.from("profiles").update({
+        eco_coins: newTotalPts,
+        updated_at: new Date().toISOString(),
+      }).eq("id", userId);
+    }
   } catch (err) {
     console.error("Error syncing earning to Supabase:", err);
   }

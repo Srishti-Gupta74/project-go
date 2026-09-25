@@ -512,8 +512,6 @@ function ScannerPage({user, onScanComplete, t, isDark}) {
   const [inputMode,setInputMode]=useState("upload");
   const [cameraError,setCameraError]=useState(null);
   const [facingMode,setFacingMode]=useState("environment");
-  const [newPts,setNewPts]=useState(null);
-  const [showBurst,setShowBurst]=useState(false);
 
   const fileRef=useRef(), videoRef=useRef(), streamRef=useRef(null), imgDisplayRef=useRef(null);
 
@@ -674,6 +672,14 @@ function ScannerPage({user, onScanComplete, t, isDark}) {
         setSelectedId(first.id);
         fetchImpact(first.itemName, first.category, first);
         findCenters(first.category, first.itemName);
+        if (onScanComplete) {
+          onScanComplete({
+            itemName: first.itemName,
+            category: first.category,
+            carbonPercent: 0,
+            date: new Date().toISOString()
+          });
+        }
       }
       setTimeout(updateImageRenderRect, 100);
     } catch (err) { setError(err.message || "Could not analyze. Try a clearer photo."); }
@@ -707,10 +713,6 @@ function ScannerPage({user, onScanComplete, t, isDark}) {
     try {
       const data = await callAI({ type: "impact", itemName, category });
       setImpact(data);
-      const pts=CATS[scanResult.category]?.points||10;
-      setNewPts(pts);setShowBurst(true);
-      setTimeout(()=>{setShowBurst(false);setNewPts(null);},2500);
-      onScanComplete({itemName:scanResult.itemName,category:scanResult.category,carbonPercent:data.carbonPercent||0,points:pts,date:new Date().toISOString()});
     } catch {}
     finally { setImpactLoading(false); }
   };
@@ -772,10 +774,6 @@ function ScannerPage({user, onScanComplete, t, isDark}) {
 
   return (
     <div style={{paddingBottom:20}}>
-      {/* Coin burst */}
-      {showBurst&&<div style={{position:"fixed",inset:0,pointerEvents:"none",zIndex:999}}>{[...Array(12)].map((_,i)=><div key={i} style={{position:"absolute",left:`${36+Math.random()*28}%`,top:`${25+Math.random()*30}%`,width:14,height:14,borderRadius:"50%",background:["#fbbf24","#4ade80","#60a5fa","#c084fc"][i%4],animation:"ww-burst 1s ease-out forwards",animationDelay:`${i*.07}s`}}/>)}</div>}
-      {newPts&&<div style={{position:"fixed",top:"34%",left:"50%",zIndex:1000,animation:"ww-coinsfly 2.2s ease-out forwards",pointerEvents:"none"}}><div style={{background:"linear-gradient(135deg,#f59e0b,#fbbf24)",borderRadius:40,padding:"10px 24px",fontFamily:"'Outfit',sans-serif",fontSize:22,fontWeight:800,color:"#1a0a00",boxShadow:"0 8px 32px rgba(251,191,36,.6)",whiteSpace:"nowrap"}}>+{newPts} 🪙 EcoCoins!</div></div>}
-
       {/* Mode selector */}
       {!scanData && (
         <div style={{display:"flex",gap:6,marginBottom:12,background:isDark?"rgba(0,0,0,.4)":"rgba(0,0,0,.06)",borderRadius:14,padding:4}}>
@@ -826,7 +824,7 @@ function ScannerPage({user, onScanComplete, t, isDark}) {
             <div style={{textAlign:"center"}}>
               <div style={{fontSize:44,marginBottom:12,filter:"drop-shadow(0 4px 12px rgba(74,222,128,.3))"}}>🌿</div>
               <p style={{color:t.green,fontWeight:700,margin:"0 0 6px",fontSize:16,fontFamily:"'Outfit',sans-serif"}}>Drop a photo of your waste</p>
-              <p style={{color:t.textDim,fontSize:13,margin:0,fontFamily:"'Outfit',sans-serif"}}>or tap to upload · earn EcoCoins 🪙</p>
+              <p style={{color:t.textDim,fontSize:13,margin:0,fontFamily:"'Outfit',sans-serif"}}>or tap to upload photo</p>
             </div>
           )}
         </div>
@@ -1770,7 +1768,7 @@ const SCRAP_ITEMS = [
 // ═══════════════════════════════════════════════════════════════════════════════
 //  EARNINGS PAGE
 // ═══════════════════════════════════════════════════════════════════════════════
-function EarningsPage({user, t, isDark}) {
+function EarningsPage({user, t, isDark, onEarnEcoCoins}) {
   const [logs,      setLogs]      = useState(()=>ls.get(`ww_earn_${user.email}`,[]));
   const [showForm,  setShowForm]  = useState(false);
   const [selItem,   setSelItem]   = useState(SCRAP_ITEMS[0]);
@@ -1779,6 +1777,8 @@ function EarningsPage({user, t, isDark}) {
   const [note,      setNote]      = useState("");
   const [saved,     setSaved]     = useState(false);
   const [delConfirm,setDelConfirm]= useState(null);
+  const [earnedPts, setEarnedPts] = useState(null);
+  const [showBurst, setShowBurst] = useState(false);
 
   // ── Derived stats ──
   const totalEarned  = useMemo(()=>logs.reduce((s,l)=>s+l.earned,0),[logs]);
@@ -1820,7 +1820,15 @@ function EarningsPage({user, t, isDark}) {
     };
     const newLogs=[...logs, entry];
     setLogs(newLogs); ls.set(`ww_earn_${user.email}`,newLogs);
-    if(isSupabaseConfigured && user?.id) {
+
+    const pts = CATS[selItem.cat]?.points || 15;
+    setEarnedPts(pts);
+    setShowBurst(true);
+    setTimeout(() => { setShowBurst(false); setEarnedPts(null); }, 2500);
+
+    if (onEarnEcoCoins) {
+      onEarnEcoCoins(pts, entry);
+    } else if (isSupabaseConfigured && user?.id) {
       syncEarningToSupabase(user.id, {
         date: entry.date,
         buyer: entry.note || "Local Kabadiwala",
@@ -1853,12 +1861,15 @@ function EarningsPage({user, t, isDark}) {
 
   return (
     <div style={{paddingBottom:20}}>
+      {/* Coin burst on manual recycling trip entry */}
+      {showBurst&&<div style={{position:"fixed",inset:0,pointerEvents:"none",zIndex:999}}>{[...Array(12)].map((_,i)=><div key={i} style={{position:"absolute",left:`${36+Math.random()*28}%`,top:`${25+Math.random()*30}%`,width:14,height:14,borderRadius:"50%",background:["#fbbf24","#4ade80","#60a5fa","#c084fc"][i%4],animation:"ww-burst 1s ease-out forwards",animationDelay:`${i*.07}s`}}/>)}</div>}
+      {earnedPts&&<div style={{position:"fixed",top:"34%",left:"50%",zIndex:1000,animation:"ww-coinsfly 2.2s ease-out forwards",pointerEvents:"none"}}><div style={{background:"linear-gradient(135deg,#f59e0b,#fbbf24)",borderRadius:40,padding:"10px 24px",fontFamily:"'Outfit',sans-serif",fontSize:22,fontWeight:800,color:"#1a0a00",boxShadow:"0 8px 32px rgba(251,191,36,.6)",whiteSpace:"nowrap"}}>+{earnedPts} 🪙 EcoCoins!</div></div>}
 
       {/* Saved toast */}
       {saved&&<div style={{position:"fixed",top:80,left:"50%",transform:"translateX(-50%)",zIndex:1000,animation:"ww-slideup .4s ease",pointerEvents:"none"}}>
         <div style={{background:isDark?"linear-gradient(135deg,#052e16,#0d4a1a)":"linear-gradient(135deg,#dcfce7,#bbf7d0)",border:`2px solid ${t.green}`,borderRadius:18,padding:"13px 22px",display:"flex",alignItems:"center",gap:10,boxShadow:`0 12px 40px ${t.green}40`,whiteSpace:"nowrap"}}>
-          <span style={{fontSize:22}}>✅</span>
-          <div style={{fontFamily:"'Outfit',sans-serif",fontSize:14,fontWeight:700,color:t.text}}>Entry saved! Great work recycling 🎉</div>
+          <span style={{fontSize:22}}>🎉</span>
+          <div style={{fontFamily:"'Outfit',sans-serif",fontSize:14,fontWeight:700,color:t.text}}>Entry saved! You earned +{earnedPts || 15} EcoCoins 🪙</div>
         </div>
       </div>}
 
@@ -2398,17 +2409,14 @@ export default function App() {
     const history = ls.get(`ww_history_${user.email}`, []);
     history.push(scanData);
     ls.set(`ww_history_${user.email}`, history);
-    const pts = (ls.get(`ww_pts_${user.email}`, 0) || 0) + (scanData.points || 10);
     const scans = (ls.get(`ww_scans_${user.email}`, 0) || 0) + 1;
-    ls.set(`ww_pts_${user.email}`, pts);
     ls.set(`ww_scans_${user.email}`, scans);
-    setTotalPts(pts);
+    const currentPts = ls.get(`ww_pts_${user.email}`, 0) || 0;
 
     const badges = ls.get(`ww_badges_${user.email}`, []);
     let unlocked = null;
     for (const b of BADGES) {
       if (badges.includes(b.id)) continue;
-      if (b.type === "points" && pts >= b.req) { badges.push(b.id); unlocked = b; break; }
       if (!b.type && !b.cat && scans >= b.req) { badges.push(b.id); unlocked = b; break; }
       if (b.cat && (b.cat === scanData.category || b.altCat === scanData.category)) { badges.push(b.id); unlocked = b; break; }
     }
@@ -2416,7 +2424,34 @@ export default function App() {
     if (unlocked) { setNewBadge(unlocked); setTimeout(() => setNewBadge(null), 4500); }
 
     if (isSupabaseConfigured && user.id) {
-      syncScanToSupabase(user.id, scanData, pts, scans, badges);
+      syncScanToSupabase(user.id, scanData, currentPts, scans, badges);
+    }
+  }, [user]);
+
+  const handleEarnEcoCoins = useCallback((pts, entry) => {
+    if (!user) return;
+    const currentPts = ls.get(`ww_pts_${user.email}`, 0) || 0;
+    const newPts = currentPts + pts;
+    ls.set(`ww_pts_${user.email}`, newPts);
+    setTotalPts(newPts);
+
+    const badges = ls.get(`ww_badges_${user.email}`, []);
+    let unlocked = null;
+    for (const b of BADGES) {
+      if (badges.includes(b.id)) continue;
+      if (b.type === "points" && newPts >= b.req) { badges.push(b.id); unlocked = b; break; }
+    }
+    ls.set(`ww_badges_${user.email}`, badges);
+    if (unlocked) { setNewBadge(unlocked); setTimeout(() => setNewBadge(null), 4500); }
+
+    if (isSupabaseConfigured && user.id) {
+      syncEarningToSupabase(user.id, {
+        date: entry.date,
+        buyer: entry.note || "Local Kabadiwala",
+        totalKg: entry.qty,
+        totalEarned: entry.earned,
+        items: [entry],
+      }, newPts);
     }
   }, [user]);
 
@@ -2525,7 +2560,7 @@ export default function App() {
         {/* Main content */}
         <div className="ww-content" style={{position:"relative",zIndex:1}}>
           {page==="scan"     && <ScannerPage  user={user} onScanComplete={handleScanComplete} t={t} isDark={isDark}/>}
-          {page==="earnings" && <EarningsPage user={user} t={t} isDark={isDark}/>}
+          {page==="earnings" && <EarningsPage user={user} t={t} isDark={isDark} onEarnEcoCoins={handleEarnEcoCoins}/>}
           {page==="rewards"  && <RewardsPage  user={user} t={t} isDark={isDark} totalPts={totalPts} onSpend={handleSpend}/>}
           {page==="sdg"      && <SDGPage t={t} isDark={isDark}/>}
           {page==="dashboard"&& <DashboardPage user={user} t={t} isDark={isDark}/>}
