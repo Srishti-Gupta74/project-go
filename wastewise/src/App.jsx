@@ -556,7 +556,7 @@ function ScannerPage({user, onScanComplete, t, isDark}) {
   const [cameraError,setCameraError]=useState(null);
   const [facingMode,setFacingMode]=useState("environment");
 
-  const fileRef=useRef(), videoRef=useRef(), streamRef=useRef(null), imgDisplayRef=useRef(null);
+  const fileRef=useRef(), videoRef=useRef(), streamRef=useRef(null), imgDisplayRef=useRef(null), stripRef=useRef(null);
 
   const SCAN_STEPS = [
     "Scanning image for waste & reusable items...",
@@ -789,7 +789,7 @@ function ScannerPage({user, onScanComplete, t, isDark}) {
       const data = await callAI({ type: "centers", category, itemName, city });
       if (!Array.isArray(data)) throw new Error();
       setCenters(data);
-    } catch { setCentersError("Couldn't find centers. Try typing your exact city below or use Google Maps."); }
+    } catch { setCentersError("Couldn't find centers for this location. Try refining your city above or search on Google Maps."); }
     finally { setCentersLoading(false); }
   };
 
@@ -814,6 +814,54 @@ function ScannerPage({user, onScanComplete, t, isDark}) {
     : confPct >= 50
     ? { label: "Moderate Confidence", color: t.yellow }
     : { label: "Low Confidence — verify details", color: t.red };
+
+  const currentIndex = items.findIndex(it => it.id === (selectedItem?.id ?? selectedId));
+  const hasPrev = currentIndex > 0;
+  const hasNext = currentIndex >= 0 && currentIndex < items.length - 1;
+
+  const handlePrevItem = () => {
+    if (currentIndex > 0) {
+      handleSelectItem(items[currentIndex - 1].id);
+    }
+  };
+
+  const handleNextItem = () => {
+    if (currentIndex >= 0 && currentIndex < items.length - 1) {
+      handleSelectItem(items[currentIndex + 1].id);
+    }
+  };
+
+  const scrollStrip = (direction) => {
+    if (stripRef.current) {
+      const scrollAmount = direction === "left" ? -240 : 240;
+      stripRef.current.scrollBy({ left: scrollAmount, behavior: "smooth" });
+    }
+  };
+
+  useEffect(() => {
+    if (stripRef.current && selectedId) {
+      const el = stripRef.current.querySelector(`[data-item-id="${selectedId}"]`);
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+      }
+    }
+  }, [selectedId]);
+
+  useEffect(() => {
+    if (!scanData || items.length <= 1) return;
+    const onKeyDown = (e) => {
+      if (["INPUT", "TEXTAREA"].includes(document.activeElement?.tagName)) return;
+      if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        if (currentIndex > 0) handleSelectItem(items[currentIndex - 1].id);
+      } else if (e.key === "ArrowRight") {
+        e.preventDefault();
+        if (currentIndex < items.length - 1) handleSelectItem(items[currentIndex + 1].id);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [scanData, items, currentIndex]);
 
   return (
     <div style={{paddingBottom:20}}>
@@ -1069,6 +1117,72 @@ function ScannerPage({user, onScanComplete, t, isDark}) {
               })}
             </div>
 
+            {/* Prev / Next navigation overlay arrows when > 1 items detected */}
+            {items.length > 1 && (
+              <>
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); handlePrevItem(); }}
+                  disabled={!hasPrev}
+                  title={hasPrev ? `Previous item: ${items[currentIndex - 1]?.object || items[currentIndex - 1]?.itemName}` : "First item"}
+                  style={{
+                    position:"absolute",
+                    left:12,
+                    top:"50%",
+                    transform:"translateY(-50%)",
+                    width:42,
+                    height:42,
+                    borderRadius:"50%",
+                    background:"rgba(3,10,3,.85)",
+                    border:`1.5px solid ${hasPrev ? t.green : "rgba(255,255,255,.2)"}`,
+                    color:hasPrev ? "#86efac" : "rgba(255,255,255,.3)",
+                    fontSize:24,
+                    display:"flex",
+                    alignItems:"center",
+                    justifyContent:"center",
+                    cursor:hasPrev ? "pointer" : "default",
+                    backdropFilter:"blur(8px)",
+                    boxShadow:hasPrev ? "0 4px 16px rgba(0,0,0,.6), 0 0 12px rgba(74,222,128,.3)" : "none",
+                    zIndex:40,
+                    opacity:hasPrev ? 1 : 0.35,
+                    transition:"all .2s ease",
+                  }}
+                >
+                  ‹
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); handleNextItem(); }}
+                  disabled={!hasNext}
+                  title={hasNext ? `Next item: ${items[currentIndex + 1]?.object || items[currentIndex + 1]?.itemName}` : "Last item"}
+                  style={{
+                    position:"absolute",
+                    right:12,
+                    top:"50%",
+                    transform:"translateY(-50%)",
+                    width:42,
+                    height:42,
+                    borderRadius:"50%",
+                    background:"rgba(3,10,3,.85)",
+                    border:`1.5px solid ${hasNext ? t.green : "rgba(255,255,255,.2)"}`,
+                    color:hasNext ? "#86efac" : "rgba(255,255,255,.3)",
+                    fontSize:24,
+                    display:"flex",
+                    alignItems:"center",
+                    justifyContent:"center",
+                    cursor:hasNext ? "pointer" : "default",
+                    backdropFilter:"blur(8px)",
+                    boxShadow:hasNext ? "0 4px 16px rgba(0,0,0,.6), 0 0 12px rgba(74,222,128,.3)" : "none",
+                    zIndex:40,
+                    opacity:hasNext ? 1 : 0.35,
+                    transition:"all .2s ease",
+                  }}
+                >
+                  ›
+                </button>
+              </>
+            )}
+
             {/* Tap hint */}
             <div style={{
               position:"absolute",
@@ -1083,7 +1197,7 @@ function ScannerPage({user, onScanComplete, t, isDark}) {
               fontFamily:"'Outfit',sans-serif",
               pointerEvents:"none"
             }}>
-              💡 Tap any box to inspect
+              {items.length > 1 ? "💡 Tap box or use ‹ › arrows to navigate" : "💡 Tap any box to inspect"}
             </div>
           </div>
 
@@ -1151,7 +1265,7 @@ function ScannerPage({user, onScanComplete, t, isDark}) {
           {/* Horizontal Item Selector Strip (when > 1 items detected) */}
           {items.length > 1 && (
             <div style={{marginBottom:14}}>
-              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8,flexWrap:"wrap",gap:8}}>
                 <div style={{
                   fontSize:11,
                   color:t.textDim,
@@ -1162,72 +1276,182 @@ function ScannerPage({user, onScanComplete, t, isDark}) {
                 }}>
                   DETECTED ITEMS ({items.length})
                 </div>
-                <div style={{fontSize:11,color:t.textDim,fontFamily:"'Outfit',sans-serif"}}>
-                  Select an item to inspect
-                </div>
-              </div>
-              <div className="ww-item-strip" style={{
-                display:"flex",
-                gap:8,
-                overflowX:"auto",
-                paddingBottom:4,
-                scrollbarWidth:"none",
-                msOverflowStyle:"none",
-              }}>
-                {items.map((item) => {
-                  const isSel = item.id === selectedId;
-                  const sStream = item.stream || CATS[item.category] || WASTE_STREAMS[item.category] || CATS.dry;
-                  const sColor = sStream.color || t.green;
-                  return (
+                <div style={{display:"flex",alignItems:"center",gap:8}}>
+                  <span style={{fontSize:11,color:t.textDim,fontFamily:"'Outfit',sans-serif"}}>
+                    Item {currentIndex + 1} of {items.length}
+                  </span>
+                  <div style={{display:"flex",alignItems:"center",gap:4}}>
                     <button
-                      key={item.id}
-                      onClick={() => handleSelectItem(item.id)}
+                      type="button"
+                      onClick={handlePrevItem}
+                      disabled={!hasPrev}
+                      title="Previous item"
                       style={{
-                        flexShrink:0,
-                        display:"inline-flex",
+                        padding:"3px 9px",
+                        borderRadius:8,
+                        border:`1px solid ${hasPrev ? t.borderGreen : t.border}`,
+                        background:hasPrev ? (isDark ? "rgba(74,222,128,.15)" : "rgba(22,163,74,.1)") : "transparent",
+                        color:hasPrev ? t.green : t.textDim,
+                        cursor:hasPrev ? "pointer" : "not-allowed",
+                        opacity:hasPrev ? 1 : 0.4,
+                        fontFamily:"'Outfit',sans-serif",
+                        fontSize:12,
+                        fontWeight:700,
+                        display:"flex",
                         alignItems:"center",
-                        gap:7,
-                        padding:"8px 14px",
-                        borderRadius:20,
-                        border:isSel ? `2px solid ${sColor}` : `1px solid ${t.border}`,
-                        background:isSel
-                          ? (isDark ? `${sColor}25` : `${sColor}18`)
-                          : (isDark ? "rgba(255,255,255,.04)" : "rgba(255,255,255,.8)"),
-                        color:isSel ? (isDark ? sColor : sStream.darkColor || sColor) : t.text,
-                        cursor:"pointer",
-                        transition:"all .2s ease",
-                        boxShadow:isSel ? `0 2px 10px ${sColor}30` : "none",
+                        gap:3
                       }}
                     >
-                      <span style={{fontSize:15}}>{sStream.emoji || "📦"}</span>
-                      <span style={{
+                      ‹ Prev
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleNextItem}
+                      disabled={!hasNext}
+                      title="Next item"
+                      style={{
+                        padding:"3px 9px",
+                        borderRadius:8,
+                        border:`1px solid ${hasNext ? t.borderGreen : t.border}`,
+                        background:hasNext ? (isDark ? "rgba(74,222,128,.15)" : "rgba(22,163,74,.1)") : "transparent",
+                        color:hasNext ? t.green : t.textDim,
+                        cursor:hasNext ? "pointer" : "not-allowed",
+                        opacity:hasNext ? 1 : 0.4,
                         fontFamily:"'Outfit',sans-serif",
-                        fontWeight:isSel ? 700 : 600,
-                        fontSize:13,
-                        whiteSpace:"nowrap",
-                      }}>
-                        {item.object || item.itemName}
-                      </span>
-                      {isSel && (
-                        <span style={{
-                          fontSize:9,
-                          background:sColor,
-                          color:"#030a03",
-                          borderRadius:"50%",
-                          width:15,
-                          height:15,
+                        fontSize:12,
+                        fontWeight:700,
+                        display:"flex",
+                        alignItems:"center",
+                        gap:3
+                      }}
+                    >
+                      Next ›
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <div style={{position:"relative",display:"flex",alignItems:"center",gap:6}}>
+                <button
+                  type="button"
+                  onClick={() => scrollStrip("left")}
+                  title="Scroll items left"
+                  style={{
+                    width:32,
+                    height:38,
+                    borderRadius:12,
+                    border:`1px solid ${t.borderGreen}`,
+                    background:isDark ? "rgba(3,10,3,.85)" : "rgba(255,255,255,.9)",
+                    color:t.green,
+                    fontSize:18,
+                    fontWeight:700,
+                    cursor:"pointer",
+                    display:"flex",
+                    alignItems:"center",
+                    justifyContent:"center",
+                    flexShrink:0,
+                    backdropFilter:"blur(8px)",
+                    transition:"all .2s ease",
+                    boxShadow:"0 2px 8px rgba(0,0,0,.15)"
+                  }}
+                >
+                  ‹
+                </button>
+                <div
+                  ref={stripRef}
+                  className="ww-item-strip"
+                  style={{
+                    flex:1,
+                    display:"flex",
+                    gap:8,
+                    overflowX:"auto",
+                    scrollBehavior:"smooth",
+                    paddingBottom:4,
+                    paddingTop:2,
+                    scrollbarWidth:"none",
+                    msOverflowStyle:"none",
+                  }}
+                >
+                  {items.map((item) => {
+                    const isSel = item.id === selectedId;
+                    const sStream = item.stream || CATS[item.category] || WASTE_STREAMS[item.category] || CATS.dry;
+                    const sColor = sStream.color || t.green;
+                    return (
+                      <button
+                        key={item.id}
+                        data-item-id={item.id}
+                        onClick={() => handleSelectItem(item.id)}
+                        style={{
+                          flexShrink:0,
                           display:"inline-flex",
                           alignItems:"center",
-                          justifyContent:"center",
-                          fontWeight:800,
-                          marginLeft:2
+                          gap:7,
+                          padding:"8px 14px",
+                          borderRadius:20,
+                          border:isSel ? `2px solid ${sColor}` : `1px solid ${t.border}`,
+                          background:isSel
+                            ? (isDark ? `${sColor}25` : `${sColor}18`)
+                            : (isDark ? "rgba(255,255,255,.04)" : "rgba(255,255,255,.8)"),
+                          color:isSel ? (isDark ? sColor : sStream.darkColor || sColor) : t.text,
+                          cursor:"pointer",
+                          transition:"all .2s ease",
+                          boxShadow:isSel ? `0 2px 10px ${sColor}30` : "none",
+                        }}
+                      >
+                        <span style={{fontSize:15}}>{sStream.emoji || "📦"}</span>
+                        <span style={{
+                          fontFamily:"'Outfit',sans-serif",
+                          fontWeight:isSel ? 700 : 600,
+                          fontSize:13,
+                          whiteSpace:"nowrap",
                         }}>
-                          ✓
+                          {item.object || item.itemName}
                         </span>
-                      )}
-                    </button>
-                  );
-                })}
+                        {isSel && (
+                          <span style={{
+                            fontSize:9,
+                            background:sColor,
+                            color:"#030a03",
+                            borderRadius:"50%",
+                            width:15,
+                            height:15,
+                            display:"inline-flex",
+                            alignItems:"center",
+                            justifyContent:"center",
+                            fontWeight:800,
+                            marginLeft:2
+                          }}>
+                            ✓
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => scrollStrip("right")}
+                  title="Scroll items right"
+                  style={{
+                    width:32,
+                    height:38,
+                    borderRadius:12,
+                    border:`1px solid ${t.borderGreen}`,
+                    background:isDark ? "rgba(3,10,3,.85)" : "rgba(255,255,255,.9)",
+                    color:t.green,
+                    fontSize:18,
+                    fontWeight:700,
+                    cursor:"pointer",
+                    display:"flex",
+                    alignItems:"center",
+                    justifyContent:"center",
+                    flexShrink:0,
+                    backdropFilter:"blur(8px)",
+                    transition:"all .2s ease",
+                    boxShadow:"0 2px 8px rgba(0,0,0,.15)"
+                  }}
+                >
+                  ›
+                </button>
               </div>
             </div>
           )}
@@ -1247,8 +1471,53 @@ function ScannerPage({user, onScanComplete, t, isDark}) {
             marginBottom: 12,
           }}>
             {/* Header: Title, Material, Match % & Category Badge */}
-            <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:12,marginBottom:14}}>
+            <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:12,marginBottom:14,flexWrap:"wrap"}}>
               <div>
+                {items.length > 1 && (
+                  <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:6}}>
+                    <button
+                      type="button"
+                      onClick={handlePrevItem}
+                      disabled={!hasPrev}
+                      style={{
+                        padding:"2px 8px",
+                        borderRadius:8,
+                        border:`1px solid ${hasPrev ? t.borderGreen : t.border}`,
+                        background:"transparent",
+                        color:hasPrev ? t.green : t.textDim,
+                        cursor:hasPrev ? "pointer" : "not-allowed",
+                        fontSize:11,
+                        fontFamily:"'Outfit',sans-serif",
+                        fontWeight:700,
+                        opacity:hasPrev ? 1 : 0.4
+                      }}
+                    >
+                      ‹ Prev
+                    </button>
+                    <span style={{fontSize:11,color:t.textDim,fontFamily:"'Outfit',sans-serif"}}>
+                      Item {currentIndex + 1} of {items.length}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={handleNextItem}
+                      disabled={!hasNext}
+                      style={{
+                        padding:"2px 8px",
+                        borderRadius:8,
+                        border:`1px solid ${hasNext ? t.borderGreen : t.border}`,
+                        background:"transparent",
+                        color:hasNext ? t.green : t.textDim,
+                        cursor:hasNext ? "pointer" : "not-allowed",
+                        fontSize:11,
+                        fontFamily:"'Outfit',sans-serif",
+                        fontWeight:700,
+                        opacity:hasNext ? 1 : 0.4
+                      }}
+                    >
+                      Next ›
+                    </button>
+                  </div>
+                )}
                 <div style={{fontFamily:"'Fraunces',serif",fontSize:24,fontWeight:900,color:t.text,lineHeight:1.15}}>
                   {result.object || result.itemName}
                 </div>
@@ -1458,57 +1727,182 @@ function ScannerPage({user, onScanComplete, t, isDark}) {
 
           {/* Centers */}
           <div style={{marginBottom:12}}>
-            {!centers&&!centersLoading&&(
-              <div style={{display:"flex",flexDirection:"column",gap:8}}>
-                <button className="ww-btn-green" onClick={()=>findCenters(result.category,result.itemName)}
-                  style={{width:"100%",padding:"14px",background:isDark?"rgba(96,165,250,.12)":"rgba(37,99,235,.08)",border:`1px solid ${t.blue}40`,borderRadius:16,cursor:"pointer",color:t.blue,fontSize:14,fontWeight:700,fontFamily:"'Outfit',sans-serif",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
-                  {result.isWaste ? "📍 Detect GPS Location & Find Disposal Centers" : "📍 Detect GPS Location & Find Donation / Drop-off Centers"}
-                </button>
-                <div style={{display:"flex",gap:6,alignItems:"center"}}>
-                  <input value={customCityInput} onChange={e=>setCustomCityInput(e.target.value)} placeholder="or type city/area (e.g. Malviya Nagar, Jaipur)..."
-                    style={{flex:1,padding:"11px 13px",background:t.inputBg,border:`1px solid ${t.border}`,borderRadius:12,color:t.text,fontSize:13,fontFamily:"'Outfit',sans-serif",outline:"none"}}
-                    onKeyDown={e=>{if(e.key==="Enter"&&customCityInput.trim()) findCenters(result.category,result.itemName,customCityInput.trim());}} />
-                  <button onClick={()=>{if(customCityInput.trim()) findCenters(result.category,result.itemName,customCityInput.trim()); else findCenters(result.category,result.itemName);}}
-                    style={{padding:"11px 16px",background:t.blue,border:"none",borderRadius:12,color:"#fff",fontSize:13,fontWeight:700,fontFamily:"'Outfit',sans-serif",cursor:"pointer",display:"flex",alignItems:"center",gap:5}}>
-                    🔍 Search
-                  </button>
+            {/* Unified Single Location Search Bar */}
+            <div style={{
+              background: isDark ? "rgba(255,255,255,.03)" : "rgba(37,99,235,.04)",
+              border: `1px solid ${isDark ? "rgba(96,165,250,.2)" : "rgba(37,99,235,.15)"}`,
+              borderRadius: 18,
+              padding: "14px 16px",
+              marginBottom: 10
+            }}>
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10,flexWrap:"wrap",gap:8}}>
+                <div style={{fontSize:11,color:t.blue,fontWeight:700,letterSpacing:1.5,fontFamily:"'Outfit',sans-serif"}}>
+                  📍 {result.isWaste ? "NEARBY DISPOSAL & SCRAP CENTERS" : "NEARBY DONATION & REUSE CENTERS"}
                 </div>
+                {userCity && (
+                  <span style={{fontSize:11,color:t.textDim,fontFamily:"'Outfit',sans-serif"}}>
+                    Area: <strong style={{color:t.text}}>{userCity}</strong>
+                  </span>
+                )}
               </div>
+
+              <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
+                <input
+                  value={customCityInput}
+                  onChange={e=>setCustomCityInput(e.target.value)}
+                  placeholder="Type city or area (e.g. Connaught Place, Delhi)..."
+                  style={{
+                    flex:1,
+                    minWidth:200,
+                    padding:"10px 14px",
+                    background:t.inputBg,
+                    border:`1px solid ${t.border}`,
+                    borderRadius:12,
+                    color:t.text,
+                    fontSize:13,
+                    fontFamily:"'Outfit',sans-serif",
+                    outline:"none"
+                  }}
+                  onKeyDown={e=>{
+                    if(e.key==="Enter") findCenters(result.category, result.itemName, customCityInput.trim() || null);
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => findCenters(result.category, result.itemName, customCityInput.trim() || null)}
+                  disabled={centersLoading}
+                  style={{
+                    padding:"10px 16px",
+                    background:t.blue,
+                    border:"none",
+                    borderRadius:12,
+                    color:"#fff",
+                    fontSize:13,
+                    fontWeight:700,
+                    fontFamily:"'Outfit',sans-serif",
+                    cursor:centersLoading?"not-allowed":"pointer",
+                    display:"flex",
+                    alignItems:"center",
+                    gap:5,
+                    boxShadow:`0 2px 10px ${t.blue}30`
+                  }}
+                >
+                  🔍 Search
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setCustomCityInput(""); findCenters(result.category, result.itemName, null); }}
+                  disabled={centersLoading}
+                  title="Detect current GPS location"
+                  style={{
+                    padding:"10px 14px",
+                    background:isDark ? "rgba(96,165,250,.15)" : "rgba(37,99,235,.08)",
+                    border:`1px solid ${t.blue}30`,
+                    borderRadius:12,
+                    color:t.blue,
+                    fontSize:13,
+                    fontWeight:600,
+                    fontFamily:"'Outfit',sans-serif",
+                    cursor:centersLoading?"not-allowed":"pointer",
+                    display:"flex",
+                    alignItems:"center",
+                    gap:5
+                  }}
+                >
+                  📍 Use GPS
+                </button>
+              </div>
+            </div>
+
+            {/* Loading state */}
+            {centersLoading && (
+              <Card t={t} style={{padding:"18px",borderRadius:16,display:"flex",alignItems:"center",justifyContent:"center",gap:10,marginBottom:10}}>
+                <Spinner color={t.blue} size={14}/>
+                <span style={{color:t.blue,fontSize:13,fontFamily:"'Outfit',sans-serif",fontWeight:600}}>
+                  {userCity && userCity!=="India" ? `Searching verified centers in ${userCity}...` : "Detecting location & searching centers..."}
+                </span>
+              </Card>
             )}
-            {centersLoading&&<Card t={t} style={{padding:"18px",borderRadius:16,display:"flex",alignItems:"center",justifyContent:"center",gap:10}}><Spinner color={t.blue} size={14}/><span style={{color:t.blue,fontSize:13,fontFamily:"'Outfit',sans-serif",fontWeight:600}}>{userCity&&userCity!=="India"?`Searching specifically in ${userCity}...`:"Detecting exact area & searching..."}</span></Card>}
-            {centersError&&(
-              <Card t={t} style={{padding:"13px 15px",borderRadius:14,border:`1px solid ${t.red}25`,marginBottom:8}}>
-                <p style={{color:t.red,fontSize:13,margin:"0 0 8px 0",fontFamily:"'Outfit',sans-serif"}}>⚠️ {centersError}</p>
-                <div style={{display:"flex",gap:6}}>
-                  <input value={customCityInput} onChange={e=>setCustomCityInput(e.target.value)} placeholder="Type city or area name..."
-                    style={{flex:1,padding:"9px 12px",background:t.inputBg,border:`1px solid ${t.border}`,borderRadius:10,color:t.text,fontSize:13,fontFamily:"'Outfit',sans-serif",outline:"none"}}
-                    onKeyDown={e=>{if(e.key==="Enter"&&customCityInput.trim()) findCenters(result.category,result.itemName,customCityInput.trim());}} />
-                  <button onClick={()=>{if(customCityInput.trim()) findCenters(result.category,result.itemName,customCityInput.trim());}}
-                    style={{padding:"9px 14px",background:t.blue,border:"none",borderRadius:10,color:"#fff",fontSize:13,fontWeight:700,fontFamily:"'Outfit',sans-serif",cursor:"pointer"}}>
-                    Search Area
-                  </button>
+
+            {/* Error state — Clean notice + Google Maps fallback links, NO duplicate input */}
+            {centersError && !centersLoading && (
+              <Card t={t} style={{padding:"16px",borderRadius:16,border:`1px solid ${t.red}25`,marginBottom:10,animation:"ww-slideup .3s ease"}}>
+                <div style={{display:"flex",alignItems:"flex-start",gap:10,marginBottom:12}}>
+                  <span style={{fontSize:20}}>⚠️</span>
+                  <div>
+                    <div style={{color:t.red,fontSize:13,fontWeight:700,fontFamily:"'Outfit',sans-serif",marginBottom:3}}>
+                      {centersError}
+                    </div>
+                    <p style={{color:t.textMid,fontSize:12,margin:0,fontFamily:"'Outfit',sans-serif",lineHeight:1.5}}>
+                      You can enter a different city or locality in the search bar above, or search live nearby on Google Maps:
+                    </p>
+                  </div>
+                </div>
+                <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                  <a
+                    href={`https://www.google.com/maps/search/${encodeURIComponent((result.isWaste ? 'kabadiwala scrap dealer near ' : 'donation center near ') + (customCityInput || userCity || ''))}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      flex:1,
+                      minWidth:180,
+                      display:"inline-flex",
+                      alignItems:"center",
+                      justifyContent:"center",
+                      gap:6,
+                      padding:"10px 14px",
+                      background:t.blue,
+                      borderRadius:10,
+                      color:"#fff",
+                      fontSize:12,
+                      fontWeight:700,
+                      textDecoration:"none",
+                      fontFamily:"'Outfit',sans-serif",
+                      boxShadow:`0 2px 8px ${t.blue}30`
+                    }}
+                  >
+                    🗺️ Search on Google Maps →
+                  </a>
+                  <a
+                    href={`https://www.google.com/maps/search/${encodeURIComponent('recycling center near ' + (customCityInput || userCity || ''))}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      flex:1,
+                      minWidth:180,
+                      display:"inline-flex",
+                      alignItems:"center",
+                      justifyContent:"center",
+                      gap:6,
+                      padding:"10px 14px",
+                      background:isDark ? "rgba(96,165,250,.12)" : "rgba(37,99,235,.08)",
+                      border:`1px solid ${t.blue}30`,
+                      borderRadius:10,
+                      color:t.blue,
+                      fontSize:12,
+                      fontWeight:700,
+                      textDecoration:"none",
+                      fontFamily:"'Outfit',sans-serif"
+                    }}
+                  >
+                    ♻️ Local Recycling Drop-offs →
+                  </a>
                 </div>
               </Card>
             )}
-            {centers&&(
+
+            {/* Results state */}
+            {centers && !centersLoading && (
               <div style={{animation:"ww-slideup .4s ease"}}>
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8,flexWrap:"wrap",gap:8}}>
-                  <div style={{fontSize:10,color:t.blue,letterSpacing:2,fontWeight:700,fontFamily:"'Outfit',sans-serif"}}>📍 CENTERS IN {(userCity||"YOUR AREA").toUpperCase()}</div>
-                  <span style={{fontSize:11,color:t.textDim,fontFamily:"'Outfit',sans-serif"}}>Not right? Type area below:</span>
-                </div>
-                <div style={{display:"flex",gap:6,marginBottom:12}}>
-                  <input value={customCityInput} onChange={e=>setCustomCityInput(e.target.value)} placeholder="e.g. Indiranagar, Bangalore or Andheri, Mumbai..."
-                    style={{flex:1,padding:"9px 12px",background:t.inputBg,border:`1px solid ${t.border}`,borderRadius:10,color:t.text,fontSize:12,fontFamily:"'Outfit',sans-serif",outline:"none"}}
-                    onKeyDown={e=>{if(e.key==="Enter"&&customCityInput.trim()) findCenters(result.category,result.itemName,customCityInput.trim());}} />
-                  <button onClick={()=>{if(customCityInput.trim()) findCenters(result.category,result.itemName,customCityInput.trim());}}
-                    style={{padding:"9px 14px",background:t.blue,border:"none",borderRadius:10,color:"#fff",fontSize:12,fontWeight:700,fontFamily:"'Outfit',sans-serif",cursor:"pointer",display:"flex",alignItems:"center",gap:4}}>
-                    🔍 Update Area
-                  </button>
+                <div style={{fontSize:10,color:t.blue,letterSpacing:2,fontWeight:700,fontFamily:"'Outfit',sans-serif",marginBottom:8}}>
+                  📍 FOUND {centers.length} {centers.length === 1 ? "CENTER" : "CENTERS"} IN {(userCity||"YOUR AREA").toUpperCase()}
                 </div>
                 {centers.length===0?(
                   <Card t={t} style={{padding:"20px",borderRadius:18,border:`1px solid ${t.blue}25`,textAlign:"center"}}>
                     <div style={{fontSize:26,marginBottom:8}}>📍</div>
-                    <div style={{fontFamily:"'Fraunces',serif",fontSize:16,fontWeight:800,color:t.text,marginBottom:6}}>Find Nearest Centers near {(userCity||"Your Area").split(',')[0]}</div>
+                    <div style={{fontFamily:"'Fraunces',serif",fontSize:16,fontWeight:800,color:t.text,marginBottom:6}}>
+                      Find Nearest Centers near {(userCity||"Your Area").split(',')[0]}
+                    </div>
                     <p style={{fontSize:13,color:t.textMid,margin:"0 0 16px 0",fontFamily:"'Outfit',sans-serif",lineHeight:1.6}}>
                       Explore verified local scrap dealers and recycling collection points on Google Maps:
                     </p>
