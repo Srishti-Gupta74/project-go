@@ -830,12 +830,12 @@ function ScannerPage({user, onScanComplete, t, isDark}) {
 
       {/* Camera */}
       {!scanData && inputMode==="camera"&&(
-        <div style={{borderRadius:22,overflow:"hidden",border:`1.5px solid ${t.borderGreen}`,position:"relative",background:"#000",minHeight:270}}>
+        <div style={{borderRadius:22,overflow:"hidden",border:`1.5px solid ${t.borderGreen}`,position:"relative",background:"#000",minHeight:340}}>
           {cameraError?(
             <div style={{padding:"44px 20px",textAlign:"center"}}><div style={{fontSize:36,marginBottom:12}}>📷</div><p style={{color:t.red,fontSize:13,marginBottom:14}}>{cameraError}</p><button onClick={()=>startCamera()} style={{padding:"9px 18px",background:isDark?"rgba(74,222,128,.15)":"rgba(22,163,74,.1)",border:`1px solid ${t.borderGreen}`,borderRadius:10,color:t.green,fontSize:13,cursor:"pointer"}}>Try Again</button></div>
           ):(
             <>
-              <video ref={videoRef} autoPlay playsInline muted style={{width:"100%",maxHeight:330,objectFit:"cover",display:"block"}}/>
+              <video ref={videoRef} autoPlay playsInline muted style={{width:"100%",maxHeight:460,objectFit:"cover",display:"block"}}/>
               {/* Scanner overlay */}
               <div style={{position:"absolute",inset:0,pointerEvents:"none"}}>
                 <div style={{position:"absolute",top:"50%",left:"50%",transform:"translate(-50%,-54%)",width:200,height:200}}>
@@ -860,14 +860,68 @@ function ScannerPage({user, onScanComplete, t, isDark}) {
       {/* Upload */}
       {!scanData && inputMode==="upload"&&(
         <div className="ww-upload" onDragOver={e=>{e.preventDefault();setDragOver(true)}} onDragLeave={()=>setDragOver(false)} onDrop={e=>{e.preventDefault();setDragOver(false);processFile(e.dataTransfer.files[0])}} onClick={()=>fileRef.current.click()}
-          style={{border:`2px dashed ${dragOver?t.green:t.borderGreen}`,borderRadius:22,padding:image?0:"48px 24px",cursor:"pointer",transition:"all .3s",background:dragOver?t.leaf1:isDark?"rgba(255,255,255,.015)":"rgba(255,255,255,.6)",overflow:"hidden"}}>
+          style={{
+            border:`2px dashed ${dragOver?t.green:t.borderGreen}`,
+            borderRadius:22,
+            padding:image?0:"54px 24px",
+            minHeight:image?340:340,
+            cursor:"pointer",
+            transition:"all .3s",
+            background:dragOver?t.leaf1:image?"#030a03":isDark?"rgba(255,255,255,.015)":"rgba(255,255,255,.6)",
+            overflow:"hidden",
+            display:"flex",
+            alignItems:"center",
+            justifyContent:"center"
+          }}>
           {image?(
-            <div style={{position:"relative"}}><img src={image} alt="waste" style={{width:"100%",maxHeight:260,objectFit:"cover",borderRadius:20,display:"block"}}/><div style={{position:"absolute",inset:0,borderRadius:20,background:"linear-gradient(to top,rgba(3,10,3,.75),transparent 55%)",display:"flex",alignItems:"flex-end",padding:16}}><span style={{fontSize:12,color:"#86efac",fontFamily:"'Outfit',sans-serif",fontWeight:600,letterSpacing:.5}}>📸 Tap to change photo</span></div></div>
+            <div style={{position:"relative",width:"100%",background:"#030a03",display:"flex",alignItems:"center",justifyContent:"center",overflow:"hidden",borderRadius:20}}>
+              <img
+                src={image}
+                alt="waste"
+                style={{
+                  width:"100%",
+                  maxHeight:520,
+                  objectFit:"contain",
+                  borderRadius:20,
+                  display:"block",
+                  margin:"0 auto"
+                }}
+              />
+              <div style={{
+                position:"absolute",
+                bottom:14,
+                right:14,
+                background:"rgba(3,10,3,.82)",
+                border:"1px solid rgba(255,255,255,.25)",
+                backdropFilter:"blur(8px)",
+                padding:"7px 14px",
+                borderRadius:20,
+                display:"flex",
+                alignItems:"center",
+                gap:6,
+                boxShadow:"0 4px 16px rgba(0,0,0,.5)"
+              }}>
+                <span style={{fontSize:13}}>📸</span>
+                <span style={{fontSize:12,color:"#86efac",fontFamily:"'Outfit',sans-serif",fontWeight:600,letterSpacing:.4}}>Tap to change photo</span>
+              </div>
+            </div>
           ):(
-            <div style={{textAlign:"center"}}>
-              <div style={{fontSize:44,marginBottom:12,filter:"drop-shadow(0 4px 12px rgba(74,222,128,.3))"}}>🌿</div>
-              <p style={{color:t.green,fontWeight:700,margin:"0 0 6px",fontSize:16,fontFamily:"'Outfit',sans-serif"}}>Drop a photo of your waste</p>
-              <p style={{color:t.textDim,fontSize:13,margin:0,fontFamily:"'Outfit',sans-serif"}}>or tap to upload photo</p>
+            <div style={{textAlign:"center",padding:"16px 20px"}}>
+              <div style={{fontSize:52,marginBottom:14,filter:"drop-shadow(0 6px 16px rgba(74,222,128,.35))"}}>🌿</div>
+              <p style={{color:t.green,fontWeight:700,margin:"0 0 8px",fontSize:18,fontFamily:"'Outfit',sans-serif"}}>Drop a photo of your waste</p>
+              <p style={{color:t.textDim,fontSize:14,margin:"0 0 14px",fontFamily:"'Outfit',sans-serif"}}>or tap anywhere to browse files</p>
+              <span style={{
+                display:"inline-block",
+                padding:"5px 14px",
+                borderRadius:20,
+                fontSize:11,
+                color:t.textMid,
+                background:isDark?"rgba(255,255,255,.05)":"rgba(0,0,0,.04)",
+                border:`1px solid ${t.border}`,
+                fontFamily:"'Outfit',sans-serif"
+              }}>
+                Supports JPG, PNG, WebP · Multi-object AI identification
+              </span>
             </div>
           )}
         </div>
@@ -928,7 +982,7 @@ function ScannerPage({user, onScanComplete, t, isDark}) {
               onLoad={updateImageRenderRect}
               style={{
                 width:"100%",
-                maxHeight:390,
+                maxHeight:520,
                 objectFit:"contain",
                 display:"block",
                 margin:"0 auto",
