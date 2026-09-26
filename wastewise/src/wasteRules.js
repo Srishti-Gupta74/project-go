@@ -333,18 +333,21 @@ export function validateWasteClassification(rawResult, userConditionOverride = n
   if (matchesPattern(norm, BULKY_OBJECTS)) {
     bin = null; // NEVER allow a household bin for bulky furniture!
 
+    const isFurniture = matchesPattern(norm, ["bed", "mattress", "sofa", "couch", "chair", "table", "desk", "wardrobe", "cupboard", "cabinet", "shelf", "bookshelf", "dresser"]);
+    const itemKind = isFurniture ? "furniture" : "appliance / item";
+
     if (condition === "usable") {
       isWaste = false;
       category = "REUSABLE";
       action = "REUSE";
       disposalRoute = "Donate to local charities/shelters, resell on second-hand marketplaces, or give away to neighbors.";
-      reason = `This ${objectName} appears to be functional furniture rather than waste. Reusing or donating keeps large items out of landfills.`;
+      reason = `This ${objectName} appears to be functional ${itemKind} rather than waste. Reusing or donating keeps large items out of landfills.`;
     } else if (condition === "damaged") {
       isWaste = true;
       category = "BULKY_WASTE";
       action = "BULKY_WASTE";
-      disposalRoute = "Schedule a municipal bulky-waste pickup or arrange pickup with a local furniture dismantler/scrap dealer.";
-      reason = `This ${objectName} is a large/bulky item. Oversized furniture cannot go into household bins and must be collected via bulky waste services.`;
+      disposalRoute = `Schedule a municipal bulky-waste pickup or arrange pickup with a local ${isFurniture ? "furniture" : "appliance"} dismantler/scrap dealer.`;
+      reason = `This ${objectName} is a large/bulky ${itemKind}. Oversized items cannot go into household bins and must be collected via bulky waste services.`;
     } else {
       // Condition unknown
       isWaste = false;
@@ -352,7 +355,7 @@ export function validateWasteClassification(rawResult, userConditionOverride = n
       action = "BULKY_WASTE";
       userConfirmationRequired = true;
       disposalRoute = "If still usable, donate or sell. If broken or worn out, schedule municipal bulky waste collection.";
-      reason = `This ${objectName} is a bulky item. Its condition is uncertain from the photo—verify if it can be reused before discarding.`;
+      reason = `This ${objectName} is a bulky ${itemKind}. Its condition is uncertain from the photo—verify if it can be reused before discarding.`;
     }
   }
 

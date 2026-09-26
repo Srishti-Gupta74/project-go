@@ -297,26 +297,26 @@ const GlobalStyles = () => (
 
     /* Desktop: sidebar + content */
     .ww-main-layout{
-      max-width:1200px; margin:0 auto; width:100%;
-      padding:24px 24px 60px;
-      display:flex; gap:28px; align-items:flex-start;
+      max-width:1240px; margin:0 auto; width:100%;
+      padding:24px 20px 60px;
+      display:flex; gap:24px; align-items:flex-start;
     }
     .ww-sidebar{
       display:none;
-      flex:0 0 260px;
+      flex:0 0 240px;
       position:sticky; top:90px;
     }
-    .ww-content{ flex:1; min-width:0; max-width:680px; width:100%; }
-    .ww-right-panel{ display:none; flex:0 0 300px; position:sticky; top:90px; }
+    .ww-content{ flex:1; min-width:0; max-width:740px; width:100%; }
+    .ww-right-panel{ display:none; flex:0 0 260px; position:sticky; top:90px; }
+    .ww-item-strip::-webkit-scrollbar{ display:none; }
 
     @media(min-width:900px){
       .ww-nav-tabs{ display:none!important; }
       .ww-sidebar{ display:flex!important; flex-direction:column; gap:8px; }
       .ww-main-layout{ padding-top:28px; }
     }
-    @media(min-width:1100px){
+    @media(min-width:1200px){
       .ww-right-panel{ display:block!important; }
-      .ww-content{ max-width:560px; }
     }
 
     /* Mobile Responsive Layout Master Rules */
@@ -1097,23 +1097,28 @@ function ScannerPage({user, onScanComplete, t, isDark}) {
           {/* Horizontal Item Selector Strip (when > 1 items detected) */}
           {items.length > 1 && (
             <div style={{marginBottom:14}}>
-              <div style={{
-                fontSize:10,
-                color:t.textDim,
-                letterSpacing:1.5,
-                textTransform:"uppercase",
-                marginBottom:8,
-                fontFamily:"'Outfit',sans-serif",
-                fontWeight:700
-              }}>
-                SELECT ITEM TO INSPECT ({items.length})
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
+                <div style={{
+                  fontSize:11,
+                  color:t.textDim,
+                  letterSpacing:1.5,
+                  textTransform:"uppercase",
+                  fontFamily:"'Outfit',sans-serif",
+                  fontWeight:700
+                }}>
+                  DETECTED ITEMS ({items.length})
+                </div>
+                <div style={{fontSize:11,color:t.textDim,fontFamily:"'Outfit',sans-serif"}}>
+                  Select an item to inspect
+                </div>
               </div>
-              <div style={{
+              <div className="ww-item-strip" style={{
                 display:"flex",
                 gap:8,
                 overflowX:"auto",
-                paddingBottom:6,
-                scrollbarWidth:"thin"
+                paddingBottom:4,
+                scrollbarWidth:"none",
+                msOverflowStyle:"none",
               }}>
                 {items.map((item) => {
                   const isSel = item.id === selectedId;
@@ -1125,54 +1130,43 @@ function ScannerPage({user, onScanComplete, t, isDark}) {
                       onClick={() => handleSelectItem(item.id)}
                       style={{
                         flexShrink:0,
-                        display:"flex",
+                        display:"inline-flex",
                         alignItems:"center",
-                        gap:8,
-                        padding:"9px 14px",
-                        borderRadius:14,
+                        gap:7,
+                        padding:"8px 14px",
+                        borderRadius:20,
                         border:isSel ? `2px solid ${sColor}` : `1px solid ${t.border}`,
                         background:isSel
                           ? (isDark ? `${sColor}25` : `${sColor}18`)
-                          : (isDark ? "rgba(255,255,255,.03)" : "rgba(255,255,255,.6)"),
+                          : (isDark ? "rgba(255,255,255,.04)" : "rgba(255,255,255,.8)"),
                         color:isSel ? (isDark ? sColor : sStream.darkColor || sColor) : t.text,
                         cursor:"pointer",
                         transition:"all .2s ease",
-                        boxShadow:isSel ? `0 4px 14px ${sColor}30` : "none",
+                        boxShadow:isSel ? `0 2px 10px ${sColor}30` : "none",
                       }}
                     >
-                      <span style={{fontSize:16}}>{sStream.emoji || "📦"}</span>
-                      <div style={{textAlign:"left"}}>
-                        <div style={{
-                          fontFamily:"'Outfit',sans-serif",
-                          fontWeight:700,
-                          fontSize:13,
-                          whiteSpace:"nowrap",
-                          color:isSel ? (isDark ? sColor : sStream.darkColor || sColor) : t.text
-                        }}>
-                          {item.object || item.itemName}
-                        </div>
-                        <div style={{
-                          fontSize:10,
-                          color:t.textDim,
-                          fontFamily:"'Outfit',sans-serif",
-                          fontWeight:500
-                        }}>
-                          {sStream.shortLabel || sStream.label}
-                        </div>
-                      </div>
+                      <span style={{fontSize:15}}>{sStream.emoji || "📦"}</span>
+                      <span style={{
+                        fontFamily:"'Outfit',sans-serif",
+                        fontWeight:isSel ? 700 : 600,
+                        fontSize:13,
+                        whiteSpace:"nowrap",
+                      }}>
+                        {item.object || item.itemName}
+                      </span>
                       {isSel && (
                         <span style={{
-                          marginLeft:4,
-                          fontSize:10,
+                          fontSize:9,
                           background:sColor,
                           color:"#030a03",
                           borderRadius:"50%",
-                          width:16,
-                          height:16,
+                          width:15,
+                          height:15,
                           display:"inline-flex",
                           alignItems:"center",
                           justifyContent:"center",
-                          fontWeight:800
+                          fontWeight:800,
+                          marginLeft:2
                         }}>
                           ✓
                         </span>
@@ -1188,203 +1182,176 @@ function ScannerPage({user, onScanComplete, t, isDark}) {
 
       {/* ── RESULT INSPECTOR ── */}
       {result&&cat&&(
-        <div style={{marginTop:18,animation:"ww-slideup .5s ease"}}>
-          {/* Category hero */}
-          <div style={{background:`linear-gradient(135deg,${isDark?cat.bg:"#f0fdf4"},${isDark?"rgba(5,13,5,.98)":"#dcfce7"})`,border:`1.5px solid ${catColor}30`,borderRadius:24,padding:"20px",boxShadow:`0 12px 40px ${catColor}20`,marginBottom:12}}>
-            {/* Header: Object name & material + category & waste status */}
+        <div style={{marginTop:16,animation:"ww-slideup .4s ease"}}>
+          {/* Main Inspection Card */}
+          <div style={{
+            background: isDark ? "rgba(10,25,12,.85)" : "#ffffff",
+            border: `1.5px solid ${isDark ? `${catColor}35` : `${catColor}28`}`,
+            borderRadius: 22,
+            padding: "20px 22px",
+            boxShadow: `0 8px 32px ${isDark ? "rgba(0,0,0,.35)" : "rgba(22,163,74,.07)"}`,
+            marginBottom: 12,
+          }}>
+            {/* Header: Title, Material, Match % & Category Badge */}
             <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:12,marginBottom:14}}>
-              <div style={{flex: 1}}>
-                <div style={{fontSize:10,color:t.textDim,letterSpacing:2.5,textTransform:"uppercase",marginBottom:4,fontFamily:"'Outfit',sans-serif",fontWeight:600}}>
-                  Identified Object
-                </div>
+              <div>
                 <div style={{fontFamily:"'Fraunces',serif",fontSize:24,fontWeight:900,color:t.text,lineHeight:1.15}}>
                   {result.object || result.itemName}
                 </div>
-                {result.material && (
-                  <div style={{fontSize:12,color:t.textMid,fontFamily:"'Outfit',sans-serif",marginTop:4}}>
-                    Material: <span style={{color:t.text,fontWeight:600}}>{result.material}</span>
-                  </div>
-                )}
+                <div style={{display:"flex",alignItems:"center",gap:8,marginTop:4,flexWrap:"wrap"}}>
+                  {result.material && (
+                    <span style={{fontSize:12,color:t.textMid,fontFamily:"'Outfit',sans-serif"}}>
+                      {result.material}
+                    </span>
+                  )}
+                  {confPct && (
+                    <span style={{fontSize:11,color:t.textDim,fontFamily:"'Outfit',sans-serif",display:"flex",alignItems:"center",gap:4}}>
+                      • <span style={{color:confLevel.color,fontWeight:600}}>{confPct}% AI match</span>
+                    </span>
+                  )}
+                </div>
               </div>
 
-              <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:6}}>
-                <div style={{padding:"8px 14px",borderRadius:40,background:`${catColor}20`,border:`1.5px solid ${catColor}50`,color:catColor,fontWeight:700,fontSize:13,fontFamily:"'Outfit',sans-serif",display:"flex",alignItems:"center",gap:6,whiteSpace:"nowrap"}}>
-                  <span>{cat.emoji}</span> <span>{cat.shortLabel || cat.label}</span>
-                </div>
-                {!result.isWaste && (
-                  <span style={{padding:"4px 10px",borderRadius:20,background:isDark?"rgba(74,222,128,.18)":"rgba(22,163,74,.15)",border:`1px solid ${t.green}50`,color:t.green,fontWeight:700,fontSize:11,fontFamily:"'Outfit',sans-serif",letterSpacing:.5}}>
-                    ✨ NOT WASTE
+              {/* Single clean primary badge */}
+              <div style={{
+                padding:"6px 14px",
+                borderRadius:30,
+                background:`${catColor}18`,
+                border:`1px solid ${catColor}40`,
+                color:catColor,
+                fontWeight:700,
+                fontSize:12,
+                fontFamily:"'Outfit',sans-serif",
+                display:"inline-flex",
+                alignItems:"center",
+                gap:6,
+                whiteSpace:"nowrap",
+                flexShrink:0
+              }}>
+                <span>{cat.emoji}</span>
+                <span>{cat.shortLabel || cat.label}</span>
+                {!result.isWaste && <span style={{fontSize:10,opacity:.85}}>• Not Waste</span>}
+              </div>
+            </div>
+
+            {/* Core Action & Guidance block */}
+            <div style={{
+              padding:"14px 16px",
+              borderRadius:16,
+              background:isDark ? "rgba(255,255,255,.03)" : "rgba(74,222,128,.05)",
+              border:`1px solid ${isDark ? "rgba(255,255,255,.07)" : "rgba(22,163,74,.15)"}`,
+              marginBottom:12
+            }}>
+              <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}>
+                <span style={{fontSize:18}}>{cat.emoji || "♻️"}</span>
+                <span style={{fontFamily:"'Outfit',sans-serif",fontWeight:800,fontSize:15,color:catColor}}>
+                  {cat.actionLabel || result.action}
+                </span>
+                {result.recyclable && (
+                  <span style={{marginLeft:"auto",background:`${t.green}18`,border:`1px solid ${t.green}40`,borderRadius:20,padding:"2px 8px",fontSize:10,color:t.green,fontWeight:700,fontFamily:"'Outfit',sans-serif"}}>
+                    ♻️ Recyclable
                   </span>
                 )}
               </div>
-            </div>
 
-            {/* Recommended Action & Condition Banner */}
-            <div style={{
-              padding:"12px 14px",
-              borderRadius:16,
-              background:isDark?"rgba(0,0,0,.35)":"rgba(255,255,255,.7)",
-              border:`1px solid ${catColor}25`,
-              backdropFilter:"blur(8px)",
-              display:"flex",
-              alignItems:"center",
-              justifyContent:"space-between",
-              gap:10,
-              flexWrap:"wrap",
-              marginBottom:14
-            }}>
-              <div>
-                <div style={{fontSize:9,color:t.textDim,letterSpacing:1.8,fontWeight:700,textTransform:"uppercase",marginBottom:2,fontFamily:"'Outfit',sans-serif"}}>
-                  RECOMMENDED ACTION
-                </div>
-                <div style={{color:catColor,fontWeight:800,fontSize:15,fontFamily:"'Outfit',sans-serif",display:"flex",alignItems:"center",gap:6}}>
-                  <span>{cat.emoji}</span>
-                  <span>{cat.actionLabel || result.action}</span>
-                </div>
-              </div>
-              {result.condition && (
-                <div style={{
-                  fontSize:11,
-                  fontWeight:700,
-                  padding:"5px 11px",
-                  borderRadius:12,
-                  fontFamily:"'Outfit',sans-serif",
-                  background:result.condition === "usable" ? (isDark ? "rgba(74,222,128,.2)" : "rgba(22,163,74,.15)") : result.condition === "damaged" ? (isDark ? "rgba(248,113,113,.2)" : "rgba(220,38,38,.12)") : (isDark ? "rgba(251,191,36,.2)" : "rgba(217,119,6,.15)"),
-                  color:result.condition === "usable" ? t.green : result.condition === "damaged" ? t.red : t.yellow,
-                  border:`1px solid ${result.condition === "usable" ? t.green : result.condition === "damaged" ? t.red : t.yellow}40`,
-                  textTransform:"uppercase",
-                  letterSpacing:.5,
-                }}>
-                  Condition: {result.condition}
-                </div>
-              )}
-            </div>
+              <p style={{fontSize:13,color:t.text,lineHeight:1.55,margin:"0 0 10px 0",fontFamily:"'Outfit',sans-serif"}}>
+                {result.disposalRoute || result.disposal || "Follow local community sorting rules."}
+              </p>
 
-            {/* AI Confidence Meter with Level */}
-            <div style={{marginBottom:14}}>
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",fontSize:10,color:t.textDim,marginBottom:6,fontFamily:"'Outfit',sans-serif",fontWeight:600,letterSpacing:1}}>
-                <span>AI CONFIDENCE</span>
-                <div style={{display:"flex",alignItems:"center",gap:6}}>
-                  <span style={{color:confLevel.color,fontWeight:700,fontSize:11}}>{confLevel.label}</span>
-                  <span style={{color:catColor,fontWeight:700}}>({confPct}%)</span>
-                </div>
-              </div>
-              <div style={{height:6,background:isDark?"rgba(255,255,255,.06)":"rgba(0,0,0,.08)",borderRadius:3,overflow:"hidden"}}>
-                <div style={{height:"100%",width:`${confPct}%`,background:`linear-gradient(90deg,${confLevel.color}80,${confLevel.color})`,borderRadius:3,transition:"width 1.2s cubic-bezier(.4,0,.2,1)",boxShadow:`0 0 8px ${confLevel.color}60`}}/>
-              </div>
-            </div>
-
-            {/* Why / Explanation */}
-            {result.reason && (
+              {/* Clear Disposal Instruction Rule */}
               <div style={{
-                marginBottom:14,
-                padding:"10px 14px",
-                borderRadius:12,
-                background:isDark?"rgba(0,0,0,.25)":"rgba(255,255,255,.5)",
-                borderLeft:`3.5px solid ${catColor}`,
-                fontSize:12,
-                color:t.textMid,
-                lineHeight:1.6,
-                fontFamily:"'Outfit',sans-serif"
+                display:"flex",
+                alignItems:"center",
+                gap:7,
+                fontSize:11,
+                color:result.bin ? t.green : t.textDim,
+                fontWeight:600,
+                fontFamily:"'Outfit',sans-serif",
+                paddingTop:8,
+                borderTop:`1px solid ${isDark ? "rgba(255,255,255,.06)" : "rgba(0,0,0,.06)"}`
               }}>
-                <strong style={{color:t.text}}>💡 Why: </strong>{result.reason}
+                <span>{result.bin ? "🗑️" : "🚫"}</span>
+                <span>{result.bin ? `Throw in: ${result.bin}` : "Do not discard in household trash or recycling bins."}</span>
               </div>
-            )}
+            </div>
 
-            {/* Interactive Condition Confirmation (when applicable or required) */}
+            {/* Inline Condition Selector (when applicable) - clean, compact, non-intrusive */}
             {(result.userConfirmationRequired || ["REUSABLE", "BULKY_WASTE", "TEXTILE"].includes(result.category) || result.condition === "unknown") && (
               <div style={{
-                marginBottom:14,
-                padding:"12px 14px",
-                borderRadius:16,
-                background:isDark?"rgba(251,191,36,.06)":"rgba(245,158,11,.08)",
-                border:`1.5px dashed ${t.yellow}60`,
+                display:"flex",
+                alignItems:"center",
+                justifyContent:"space-between",
+                gap:8,
+                padding:"8px 12px",
+                borderRadius:12,
+                background:isDark ? "rgba(255,255,255,.02)" : "rgba(0,0,0,.02)",
+                border:`1px solid ${t.border}`,
+                marginBottom:10,
+                flexWrap:"wrap"
               }}>
-                <div style={{fontSize:11,fontWeight:700,color:t.yellow,letterSpacing:1,textTransform:"uppercase",marginBottom:4,fontFamily:"'Outfit',sans-serif"}}>
-                  🤔 Confirm Item Usability
-                </div>
-                <p style={{fontSize:12,color:t.textMid,margin:"0 0 8px 0",lineHeight:1.45,fontFamily:"'Outfit',sans-serif"}}>
-                  Is this item still working and usable? Changing this updates whether it should be reused/donated or scheduled for bulky disposal.
-                </p>
-                <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                <span style={{fontSize:11,fontWeight:600,color:t.textDim,fontFamily:"'Outfit',sans-serif"}}>
+                  Condition:
+                </span>
+                <div style={{display:"flex",gap:5}}>
                   {[
-                    { id:"usable", label:"✅ Usable / Working" },
-                    { id:"damaged", label:"❌ Broken / Damaged" },
-                    { id:"unknown", label:"❓ Not Sure" },
-                  ].map(c=>(
-                    <button
-                      key={c.id}
-                      onClick={()=>handleConditionChange(c.id)}
-                      style={{
-                        flex:1,
-                        minWidth:95,
-                        padding:"8px 10px",
-                        borderRadius:10,
-                        border:result.condition === c.id ? `1.5px solid ${t.green}` : `1px solid ${t.border}`,
-                        background:result.condition === c.id ? (isDark ? "rgba(74,222,128,.22)" : "rgba(22,163,74,.18)") : (isDark ? "rgba(255,255,255,.05)" : "rgba(255,255,255,.7)"),
-                        color:result.condition === c.id ? t.green : t.text,
-                        fontSize:11,
-                        fontWeight:700,
-                        fontFamily:"'Outfit',sans-serif",
-                        cursor:"pointer",
-                        transition:"all .2s",
-                      }}
-                    >
-                      {c.label}
-                    </button>
-                  ))}
+                    { id:"usable", label:"Usable" },
+                    { id:"damaged", label:"Damaged" },
+                    { id:"unknown", label:"Not Sure" },
+                  ].map(c => {
+                    const isAct = result.condition === c.id;
+                    return (
+                      <button
+                        key={c.id}
+                        onClick={() => handleConditionChange(c.id)}
+                        style={{
+                          padding:"4px 10px",
+                          borderRadius:8,
+                          border:isAct ? `1.5px solid ${t.green}` : `1px solid ${t.border}`,
+                          background:isAct ? (isDark ? "rgba(74,222,128,.18)" : "rgba(22,163,74,.12)") : "transparent",
+                          color:isAct ? t.green : t.textDim,
+                          fontSize:11,
+                          fontWeight:isAct ? 700 : 500,
+                          fontFamily:"'Outfit',sans-serif",
+                          cursor:"pointer",
+                          transition:"all .2s"
+                        }}
+                      >
+                        {isAct ? `✓ ${c.label}` : c.label}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             )}
 
-            {/* Disposal Route / Bin Recommendation */}
-            {result.bin ? (
-              <div style={{display:"flex",alignItems:"center",gap:12,padding:"13px 15px",background:isDark?"rgba(0,0,0,.35)":"rgba(255,255,255,.7)",borderRadius:16,border:`1px solid ${catColor}25`,backdropFilter:"blur(8px)"}}>
-                <span style={{fontSize:26}}>🗑️</span>
-                <div style={{flex:1}}>
-                  <div style={{fontSize:10,color:t.textDim,letterSpacing:1.5,fontFamily:"'Outfit',sans-serif",fontWeight:600}}>THROW IN</div>
-                  <div style={{color:catColor,fontWeight:700,fontSize:15,fontFamily:"'Outfit',sans-serif"}}>{result.bin}</div>
-                </div>
-                {result.recyclable&&<div style={{marginLeft:"auto",background:`${t.green}20`,border:`1px solid ${t.green}40`,borderRadius:30,padding:"4px 12px",fontSize:11,color:t.green,fontWeight:700,fontFamily:"'Outfit',sans-serif"}}>♻️ RECYCLABLE</div>}
-              </div>
-            ) : (
-              <div style={{display:"flex",alignItems:"flex-start",gap:12,padding:"14px 16px",background:isDark?"rgba(0,0,0,.35)":"rgba(255,255,255,.7)",borderRadius:16,border:`1px solid ${catColor}25`,backdropFilter:"blur(8px)"}}>
-                <span style={{fontSize:26,lineHeight:1}}>
-                  {result.action === "REUSE" ? "🔄" : result.action === "BULKY_WASTE" ? "🛋️" : result.action === "SPECIAL_DISPOSAL" ? "⚠️" : result.action === "COMPOST" ? "🌱" : "🚚"}
-                </span>
-                <div style={{flex:1}}>
-                  <div style={{fontSize:10,color:t.textDim,letterSpacing:1.5,fontFamily:"'Outfit',sans-serif",fontWeight:600}}>
-                    DISPOSAL / CIRCULAR ROUTE
-                  </div>
-                  <div style={{color:catColor,fontWeight:700,fontSize:14,fontFamily:"'Outfit',sans-serif",lineHeight:1.45,marginTop:3}}>
-                    {result.disposalRoute || "Follow local municipality guidelines"}
-                  </div>
-                  <div style={{fontSize:11,color:t.textDim,marginTop:5,fontFamily:"'Outfit',sans-serif"}}>
-                    🚫 Do not discard in ordinary household bins.
-                  </div>
-                </div>
-                {result.recyclable&&<div style={{marginLeft:"auto",background:`${t.green}20`,border:`1px solid ${t.green}40`,borderRadius:30,padding:"4px 12px",fontSize:11,color:t.green,fontWeight:700,fontFamily:"'Outfit',sans-serif",alignSelf:"center"}}>♻️ RECYCLABLE</div>}
+            {/* Subtle Why Note */}
+            {result.reason && (
+              <div style={{fontSize:11,color:t.textDim,lineHeight:1.45,fontFamily:"'Outfit',sans-serif",display:"flex",alignItems:"flex-start",gap:6,paddingTop:2}}>
+                <span style={{fontSize:12,flexShrink:0}}>💡</span>
+                <span>{result.reason}</span>
               </div>
             )}
           </div>
 
-          {/* Impact panel */}
-          <Card t={t} style={{padding:"20px",borderRadius:24,marginBottom:12,border:`1.5px solid ${t.borderGreen}`}}>
-            <div style={{fontSize:11,color:t.green,letterSpacing:2,marginBottom:14,fontWeight:700,fontFamily:"'Outfit',sans-serif",display:"flex",alignItems:"center",gap:8}}>
-              {result.isWaste ? "🌍 IF YOU RECYCLE / DISPOSE RESPONSIBLY..." : "🌍 IF YOU REUSE / DONATE THIS..."}
+          {/* Unified Impact & Insights panel */}
+          <Card t={t} style={{padding:"18px 20px",borderRadius:22,marginBottom:12,border:`1px solid ${t.borderGreen}`}}>
+            <div style={{fontSize:11,color:t.green,letterSpacing:1.8,marginBottom:12,fontWeight:700,fontFamily:"'Outfit',sans-serif",display:"flex",alignItems:"center",gap:8}}>
+              <span>{result.isWaste ? "🌍 RECYCLING IMPACT & INSIGHTS" : "🌍 REUSE & PLANET IMPACT"}</span>
             </div>
-            {impactLoading&&<div style={{display:"flex",alignItems:"center",gap:10,color:t.textMid,fontSize:13,fontFamily:"'Outfit',sans-serif"}}><Spinner color={t.green} size={14}/>Calculating your planet impact...</div>}
+            {impactLoading&&<div style={{display:"flex",alignItems:"center",gap:10,color:t.textMid,fontSize:13,fontFamily:"'Outfit',sans-serif",padding:"8px 0"}}><Spinner color={t.green} size={14}/>Calculating planet impact...</div>}
             {impact&&(
               <div style={{display:"flex",flexDirection:"column",gap:10}}>
                 {/* Carbon hero */}
-                <div style={{background:`linear-gradient(135deg,${t.green}15,${t.green}08)`,border:`1.5px solid ${t.green}30`,borderRadius:16,padding:"16px",display:"flex",alignItems:"center",gap:14}}>
-                  <span style={{fontSize:38,filter:"drop-shadow(0 4px 8px rgba(74,222,128,.4))"}}>🌱</span>
+                <div style={{background:`linear-gradient(135deg,${t.green}15,${t.green}08)`,border:`1px solid ${t.green}25`,borderRadius:14,padding:"14px 16px",display:"flex",alignItems:"center",gap:14}}>
+                  <span style={{fontSize:32,filter:"drop-shadow(0 4px 8px rgba(74,222,128,.3))"}}>🌱</span>
                   <div>
-                    <div style={{fontSize:10,color:t.textDim,letterSpacing:2,marginBottom:4,fontFamily:"'Outfit',sans-serif",fontWeight:600}}>CARBON FOOTPRINT REDUCED BY</div>
-                    <div style={{fontFamily:"'Fraunces',serif",fontSize:34,fontWeight:900,color:t.green,lineHeight:1}}>{impact.carbonPercent}%</div>
-                    <div style={{fontSize:12,color:t.textMid,marginTop:3,fontFamily:"'Outfit',sans-serif"}}>{impact.carbonSaved}</div>
+                    <div style={{fontSize:9,color:t.textDim,letterSpacing:1.5,marginBottom:2,fontFamily:"'Outfit',sans-serif",fontWeight:600}}>CARBON FOOTPRINT REDUCED</div>
+                    <div style={{fontFamily:"'Fraunces',serif",fontSize:28,fontWeight:900,color:t.green,lineHeight:1}}>{impact.carbonPercent}%</div>
+                    <div style={{fontSize:11,color:t.textMid,marginTop:2,fontFamily:"'Outfit',sans-serif"}}>{impact.carbonSaved}</div>
                   </div>
                 </div>
+
+                {/* 2x2 grid */}
                 <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
                   {[
                     {icon:"⚡",label:"ENERGY SAVED",val:impact.energySaved,color:t.blue},
@@ -1392,43 +1359,47 @@ function ScannerPage({user, onScanComplete, t, isDark}) {
                     ...(impact.waterSaved?[{icon:"💧",label:"WATER SAVED",val:impact.waterSaved,color:"#22d3ee"}]:[]),
                     ...(impact.treesEquivalent?[{icon:"🌳",label:"TREES EQUIV.",val:impact.treesEquivalent,color:t.green}]:[]),
                   ].map((s,i)=>(
-                    <div key={i} style={{background:isDark?"rgba(255,255,255,.03)":"rgba(255,255,255,.7)",border:`1px solid ${s.color}25`,borderRadius:14,padding:"13px",backdropFilter:"blur(8px)"}}>
-                      <div style={{fontSize:20,marginBottom:5}}>{s.icon}</div>
-                      <div style={{fontSize:9,color:t.textDim,letterSpacing:1.5,marginBottom:4,fontFamily:"'Outfit',sans-serif",fontWeight:700}}>{s.label}</div>
-                      <div style={{fontSize:12,color:s.color,fontWeight:700,lineHeight:1.4,fontFamily:"'Outfit',sans-serif"}}>{s.val}</div>
+                    <div key={i} style={{background:isDark?"rgba(255,255,255,.03)":"rgba(255,255,255,.7)",border:`1px solid ${s.color}20`,borderRadius:12,padding:"10px 12px"}}>
+                      <div style={{fontSize:18,marginBottom:3}}>{s.icon}</div>
+                      <div style={{fontSize:9,color:t.textDim,letterSpacing:1.2,marginBottom:2,fontFamily:"'Outfit',sans-serif",fontWeight:700}}>{s.label}</div>
+                      <div style={{fontSize:12,color:s.color,fontWeight:700,lineHeight:1.3,fontFamily:"'Outfit',sans-serif"}}>{s.val}</div>
                     </div>
                   ))}
                 </div>
-                {/* Wildlife */}
-                <div style={{background:`linear-gradient(135deg,${isDark?"rgba(5,30,10,.95)":"rgba(240,253,244,.95)"},${isDark?"rgba(5,20,8,.95)":"rgba(220,252,231,.95)"})`,border:`1.5px solid ${t.green}30`,borderRadius:16,padding:"16px",position:"relative",overflow:"hidden"}}>
-                  <div style={{position:"absolute",top:-8,right:-8,fontSize:64,opacity:.07}}>🐾</div>
-                  <div style={{fontSize:10,color:t.green,letterSpacing:2,marginBottom:8,fontWeight:700,fontFamily:"'Outfit',sans-serif"}}>🐾 WILDLIFE IMPACT</div>
-                  <p style={{color:isDark?"#c8e6c8":"#166534",fontSize:14,margin:0,lineHeight:1.8,fontFamily:"'Fraunces',serif",fontStyle:"italic"}}>"{impact.wildlifeFact}"</p>
+
+                {/* Wildlife fact */}
+                {impact.wildlifeFact && (
+                  <div style={{background:isDark?"rgba(74,222,128,.05)":"rgba(240,253,244,.8)",border:`1px solid ${t.green}20`,borderRadius:12,padding:"12px 14px"}}>
+                    <div style={{fontSize:9,color:t.green,letterSpacing:1.5,marginBottom:4,fontWeight:700,fontFamily:"'Outfit',sans-serif"}}>🐾 WILDLIFE IMPACT</div>
+                    <p style={{color:isDark?"#c8e6c8":"#166534",fontSize:13,margin:0,lineHeight:1.6,fontFamily:"'Fraunces',serif",fontStyle:"italic"}}>"{impact.wildlifeFact}"</p>
+                  </div>
+                )}
+
+                {/* Eco Tip & Fun Fact compact row */}
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                  {result.tip && (
+                    <div style={{background:isDark?"rgba(96,165,250,.06)":"rgba(239,246,255,.8)",border:`1px solid ${t.blue}20`,borderRadius:12,padding:"10px 12px"}}>
+                      <div style={{fontSize:9,color:t.blue,letterSpacing:1.5,marginBottom:3,fontWeight:700,fontFamily:"'Outfit',sans-serif"}}>💡 ECO TIP</div>
+                      <p style={{color:t.textMid,fontSize:11,margin:0,lineHeight:1.5,fontFamily:"'Outfit',sans-serif"}}>{result.tip}</p>
+                    </div>
+                  )}
+                  {impact.funFact && (
+                    <div style={{background:isDark?"rgba(192,132,252,.06)":"rgba(250,245,255,.8)",border:`1px solid ${t.purple}20`,borderRadius:12,padding:"10px 12px"}}>
+                      <div style={{fontSize:9,color:t.purple,letterSpacing:1.5,marginBottom:3,fontWeight:700,fontFamily:"'Outfit',sans-serif"}}>✨ FUN FACT</div>
+                      <p style={{color:t.textMid,fontSize:11,margin:0,lineHeight:1.5,fontFamily:"'Outfit',sans-serif"}}>{impact.funFact}</p>
+                    </div>
+                  )}
                 </div>
-                <div style={{background:isDark?"rgba(192,132,252,.06)":"rgba(124,58,237,.05)",border:`1px solid ${t.purple}20`,borderRadius:14,padding:"13px"}}>
-                  <div style={{fontSize:10,color:t.purple,letterSpacing:2,marginBottom:5,fontWeight:700,fontFamily:"'Outfit',sans-serif"}}>✨ FUN FACT</div>
-                  <p style={{color:isDark?"#e9d5ff":"#5b21b6",fontSize:13,margin:0,lineHeight:1.65,fontFamily:"'Outfit',sans-serif"}}>{impact.funFact}</p>
-                </div>
+
+                {/* India stat */}
+                {result.impactStat && (
+                  <div style={{padding:"8px 12px",borderRadius:10,background:isDark?"rgba(248,113,113,.06)":"rgba(254,242,242,.8)",border:`1px solid ${t.red}18`,fontSize:11,color:t.textMid,fontFamily:"'Outfit',sans-serif",display:"flex",alignItems:"center",gap:6}}>
+                    <span style={{fontSize:13}}>🇮🇳</span>
+                    <span><strong>India Fact:</strong> {result.impactStat}</span>
+                  </div>
+                )}
               </div>
             )}
-          </Card>
-
-          {/* Disposal + Tip */}
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
-            <Card t={t} style={{padding:"14px",borderRadius:16}}>
-              <div style={{fontSize:10,color:t.green,letterSpacing:2,marginBottom:6,fontWeight:700,fontFamily:"'Outfit',sans-serif"}}>📋 HOW TO DISPOSE</div>
-              <p style={{color:t.textMid,fontSize:12,margin:0,lineHeight:1.65,fontFamily:"'Outfit',sans-serif"}}>{result.disposal}</p>
-            </Card>
-            <Card t={t} style={{padding:"14px",borderRadius:16}}>
-              <div style={{fontSize:10,color:t.blue,letterSpacing:2,marginBottom:6,fontWeight:700,fontFamily:"'Outfit',sans-serif"}}>💡 ECO TIP</div>
-              <p style={{color:t.textMid,fontSize:12,margin:0,lineHeight:1.65,fontFamily:"'Outfit',sans-serif"}}>{result.tip}</p>
-            </Card>
-          </div>
-
-          {/* India stat */}
-          <Card t={t} style={{padding:"14px 16px",borderRadius:16,marginBottom:10,border:`1px solid ${t.red}18`}}>
-            <div style={{fontSize:10,color:t.red,letterSpacing:2,marginBottom:6,fontWeight:700,fontFamily:"'Outfit',sans-serif"}}>🇮🇳 INDIA IMPACT STAT</div>
-            <p style={{color:t.textMid,fontSize:12,margin:0,lineHeight:1.65,fontFamily:"'Outfit',sans-serif"}}>{result.impactStat}</p>
           </Card>
 
           {/* Centers */}
