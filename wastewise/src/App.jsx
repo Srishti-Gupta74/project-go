@@ -1782,7 +1782,7 @@ const SCRAP_ITEMS = [
 // ═══════════════════════════════════════════════════════════════════════════════
 //  EARNINGS PAGE
 // ═══════════════════════════════════════════════════════════════════════════════
-function EarningsPage({user, t, isDark, onEarnEcoCoins}) {
+function EarningsPage({user, t, isDark, onEarnEcoCoins, onUpdateCoins}) {
   const [logs,      setLogs]      = useState(()=>ls.get(`ww_earn_${user.email}`,[]));
   const [showForm,  setShowForm]  = useState(false);
   const [selItem,   setSelItem]   = useState(SCRAP_ITEMS[0]);
@@ -1817,6 +1817,7 @@ function EarningsPage({user, t, isDark, onEarnEcoCoins}) {
 
   const saveLog = () => {
     if(!qty||qty<=0) return;
+    const earnedAmt = parseFloat(earned)||0;
     const pts = CATS[selItem.cat]?.points || 15;
     const entry = {
       id: Date.now(),
@@ -1859,6 +1860,7 @@ function EarningsPage({user, t, isDark, onEarnEcoCoins}) {
     const newLogs=logs.filter(l=>l.id!==id);
     setLogs(newLogs); ls.set(`ww_earn_${user.email}`,newLogs);
     setDelConfirm(null);
+    if (onUpdateCoins) onUpdateCoins();
   };
 
   const ic = (val,color,size=28)=>(
@@ -2482,6 +2484,15 @@ export default function App() {
     }
   }, [user]);
 
+  const handleUpdateCoins = useCallback(() => {
+    if (!user) return;
+    const pts = getLegitUserPoints(user.email);
+    setTotalPts(pts);
+    if (isSupabaseConfigured && user.id && supabase) {
+      supabase.from("profiles").update({ eco_coins: pts, updated_at: new Date().toISOString() }).eq("id", user.id).catch(() => {});
+    }
+  }, [user]);
+
   if(!user) return <AuthPage onLogin={handleLogin} isDark={isDark} toggleDark={toggleDark}/>;
 
   const leaves=[[{top:"12%",left:"1%"},0],[{top:"25%",right:"2%"},1],[{bottom:"30%",left:"0%"},2],[{bottom:"15%",right:"3%"},0],[{top:"55%",left:"2%"},1]];
@@ -2585,7 +2596,7 @@ export default function App() {
         {/* Main content */}
         <div className="ww-content" style={{position:"relative",zIndex:1}}>
           {page==="scan"     && <ScannerPage  user={user} onScanComplete={handleScanComplete} t={t} isDark={isDark}/>}
-          {page==="earnings" && <EarningsPage user={user} t={t} isDark={isDark} onEarnEcoCoins={handleEarnEcoCoins}/>}
+          {page==="earnings" && <EarningsPage user={user} t={t} isDark={isDark} onEarnEcoCoins={handleEarnEcoCoins} onUpdateCoins={handleUpdateCoins}/>}
           {page==="rewards"  && <RewardsPage  user={user} t={t} isDark={isDark} totalPts={totalPts} onSpend={handleSpend}/>}
           {page==="sdg"      && <SDGPage t={t} isDark={isDark}/>}
           {page==="dashboard"&& <DashboardPage user={user} t={t} isDark={isDark} totalPts={totalPts}/>}
