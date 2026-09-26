@@ -1953,7 +1953,7 @@ function EarningsPage({user, t, isDark, onEarnEcoCoins}) {
             <span style={{fontSize:24}}>{selItem.icon}</span>
             <div style={{flex:1}}>
               <div style={{fontFamily:"'Outfit',sans-serif",fontSize:13,fontWeight:700,color:t.text}}>{selItem.name}</div>
-              {selItem.defaultRate>0&&<div style={{fontSize:11,color:t.textDim,fontFamily:"'Outfit',sans-serif"}}>Typical kabadiwala rate: ~₹{selItem.defaultRate}/{selItem.unit}</div>}
+              {selItem.defaultRate>0&&<div style={{fontSize:11,color:t.textDim,fontFamily:"'Outfit',sans-serif"}}>Standard India benchmark rate: ~₹{selItem.defaultRate}/{selItem.unit}</div>}
             </div>
           </div>
 
@@ -1978,9 +1978,9 @@ function EarningsPage({user, t, isDark, onEarnEcoCoins}) {
                 <input type="number" value={earned} min="0" step="0.5" placeholder="0.00" onChange={e=>setEarned(e.target.value)}
                   style={{...inputStyle,paddingLeft:28}}/>
               </div>
-              {selItem.defaultRate>0&&qty>0&&<div style={{fontSize:10,color:t.textDim,marginTop:5,fontFamily:"'Outfit',sans-serif"}}>
-                Suggested: ₹{(selItem.defaultRate*parseFloat(qty||0)).toFixed(0)}
-                <span style={{color:t.green,cursor:"pointer",fontWeight:600,marginLeft:6}} onClick={()=>setEarned((selItem.defaultRate*parseFloat(qty||0)).toFixed(0))}>Use this ↗</span>
+              {selItem.defaultRate>0&&qty>0&&<div style={{fontSize:10,color:t.textDim,marginTop:5,fontFamily:"'Outfit',sans-serif",lineHeight:1.4}}>
+                Suggested: ₹{(selItem.defaultRate*parseFloat(qty||0)).toFixed(0)} <span style={{opacity:.85}}>(standard India rate ~₹{selItem.defaultRate}/{selItem.unit})</span>
+                <span style={{color:t.green,cursor:"pointer",fontWeight:700,marginLeft:6}} onClick={()=>setEarned((selItem.defaultRate*parseFloat(qty||0)).toFixed(0))}>Use this ↗</span>
               </div>}
             </div>
           </div>
