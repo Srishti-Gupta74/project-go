@@ -143,6 +143,37 @@ const ls = {
   set:(k,v)=>{ try{localStorage.setItem(k,JSON.stringify(v));}catch{} }
 };
 
+// EcoCoins are strictly earned by logging scrap recycling entries in Earnings and spent on Rewards
+const calculateEcoCoins = (earningsList = [], redeemedList = []) => {
+  const earned = (earningsList || []).reduce((sum, entry) => {
+    const cat = entry.cat || entry.items?.[0]?.cat;
+    const pts = entry.ecoCoins ?? ((cat && CATS[cat]?.points) || 15);
+    return sum + (Number(pts) || 0);
+  }, 0);
+  const spent = (redeemedList || []).reduce((sum, r) => {
+    const rewardId = typeof r === "string" ? r : r?.id || r?.reward_id;
+    const rw = REWARDS.find(x => x.id === rewardId);
+    const cost = r?.cost || rw?.cost || 0;
+    return sum + (Number(cost) || 0);
+  }, 0);
+  return Math.max(0, earned - spent);
+};
+
+const getLegitUserPoints = (userEmail) => {
+  if (!userEmail) return 0;
+  const earnings = ls.get(`ww_earn_${userEmail}`, []);
+  const redeemed = ls.get(`ww_redeemed_${userEmail}`, []);
+  // All new users start at 0 EcoCoins; coins only increase as real recycling entries are logged
+  if (!earnings || earnings.length === 0) {
+    ls.set(`ww_pts_${userEmail}`, 0);
+    return 0;
+  }
+  const computed = calculateEcoCoins(earnings, redeemed);
+  ls.set(`ww_pts_${userEmail}`, computed);
+  return computed;
+};
+
+
 // ─── Animated leaf SVG ───────────────────────────────────────────────────────
 const FloatingLeaf = ({style, isDark}) => (
   <div style={{position:"absolute",pointerEvents:"none",opacity:.6,...style}}>
@@ -389,11 +420,23 @@ function AuthPage({onLogin, isDark, toggleDark}) {
             name: name.trim(),
             email: u,
           };
+          ls.set(`ww_pts_${u}`, 0);
+          ls.set(`ww_scans_${u}`, 0);
+          ls.set(`ww_badges_${u}`, []);
+          ls.set(`ww_earn_${u}`, []);
+          ls.set(`ww_redeemed_${u}`, []);
+          ls.set(`ww_history_${u}`, []);
           onLogin(userObj);
         } else {
           if(ls.get(`ww_user_${u}`,null)){setErr("Account already exists. Please sign in.");setLoading(false);return;}
           const userObj = { id:`local_${Date.now()}`, name:name.trim(), email:u, joined:new Date().toISOString() };
           ls.set(`ww_user_${u}`, userObj);
+          ls.set(`ww_pts_${u}`, 0);
+          ls.set(`ww_scans_${u}`, 0);
+          ls.set(`ww_badges_${u}`, []);
+          ls.set(`ww_earn_${u}`, []);
+          ls.set(`ww_redeemed_${u}`, []);
+          ls.set(`ww_history_${u}`, []);
           onLogin(userObj);
         }
       } catch(e) {
@@ -1497,10 +1540,10 @@ function ScannerPage({user, onScanComplete, t, isDark}) {
 // ═══════════════════════════════════════════════════════════════════════════════
 //  DASHBOARD PAGE
 // ═══════════════════════════════════════════════════════════════════════════════
-function DashboardPage({user, t, isDark, onResetCoins}) {
+function DashboardPage({user, t, isDark, totalPts: propPts}) {
   const [dash,setDash]=useState("overview");
   const history=ls.get(`ww_history_${user.email}`,[]);
-  const totalPts=ls.get(`ww_pts_${user.email}`,0);
+  const totalPts=propPts !== undefined ? propPts : ls.get(`ww_pts_${user.email}`,0);
   const scanCount=ls.get(`ww_scans_${user.email}`,0);
   const earnedBadges=ls.get(`ww_badges_${user.email}`,[]);
   const level=Math.floor(totalPts/50)+1;
@@ -1549,11 +1592,6 @@ function DashboardPage({user, t, isDark, onResetCoins}) {
               <div style={{textAlign:"right"}}>
                 <div style={{fontSize:10,color:isDark?"#fbbf24":"#d97706",letterSpacing:2,marginBottom:4,fontFamily:"'Outfit',sans-serif",fontWeight:600}}>ECOCOINS</div>
                 <div style={{fontFamily:"'Fraunces',serif",fontSize:32,fontWeight:900,color:isDark?"#fbbf24":"#d97706"}}>🪙 {totalPts}</div>
-                {onResetCoins && totalPts > 0 && (
-                  <button onClick={onResetCoins} title="Reset EcoCoins to 0" style={{background:"transparent",border:"none",color:t.textDim,fontSize:10,cursor:"pointer",textDecoration:"underline",fontFamily:"'Outfit',sans-serif",padding:0,marginTop:2}}>
-                    Reset to 0
-                  </button>
-                )}
               </div>
             </div>
             <div style={{fontSize:10,color:t.textDim,display:"flex",justifyContent:"space-between",marginBottom:6,fontFamily:"'Outfit',sans-serif",fontWeight:600}}><span>NEXT LEVEL IN {50-(totalPts%50)} COINS</span><span style={{color:t.green}}>{Math.round(lvlProg)}%</span></div>
@@ -1808,7 +1846,7 @@ function EarningsPage({user, t, isDark, onEarnEcoCoins}) {
 
   const saveLog = () => {
     if(!qty||qty<=0) return;
-    const earnedAmt = parseFloat(earned)||0;
+    const pts = CATS[selItem.cat]?.points || 15;
     const entry = {
       id: Date.now(),
       itemId: selItem.id,
@@ -1822,11 +1860,11 @@ function EarningsPage({user, t, isDark, onEarnEcoCoins}) {
       ratePerUnit: qty>0 ? parseFloat((earnedAmt/qty).toFixed(2)) : 0,
       note: note.trim(),
       date: new Date().toISOString(),
+      ecoCoins: pts,
     };
     const newLogs=[...logs, entry];
     setLogs(newLogs); ls.set(`ww_earn_${user.email}`,newLogs);
 
-    const pts = CATS[selItem.cat]?.points || 15;
     setEarnedPts(pts);
     setShowBurst(true);
     setTimeout(() => { setShowBurst(false); setEarnedPts(null); }, 2500);
@@ -2219,7 +2257,7 @@ function RewardsPage({user, t, isDark, totalPts, onSpend}) {
         </div>
         <div style={{textAlign:"right"}}>
           <div style={{fontSize:36}}>🎁</div>
-          <div style={{fontSize:10,color:t.textDim,fontFamily:"'Outfit',sans-serif",marginTop:4}}>Earn more by<br/>scanning waste!</div>
+          <div style={{fontSize:10,color:t.textDim,fontFamily:"'Outfit',sans-serif",marginTop:4}}>Earn more from<br/>recycling trips!</div>
         </div>
       </div>
 
@@ -2311,7 +2349,7 @@ export default function App() {
   const [isDark, setIsDark] = useState(()=>ls.get("ww_dark",true));
   const [user, setUser]     = useState(()=>ls.get("ww_currentUser",null));
   const [page, setPage]     = useState("scan");
-  const [totalPts, setTotalPts] = useState(()=>user?ls.get(`ww_pts_${user.email}`,0):0);
+  const [totalPts, setTotalPts] = useState(()=>user?getLegitUserPoints(user.email):0);
   const [newBadge, setNewBadge] = useState(null);
   const [showSignOut, setShowSignOut] = useState(false);
 
@@ -2368,15 +2406,27 @@ export default function App() {
     const loadUserData = async () => {
       if (isSupabaseConfigured && user.id) {
         const data = await fetchUserData(user.id, user.email);
-        setTotalPts(data.ecoCoins);
-        ls.set(`ww_pts_${user.email}`, data.ecoCoins);
+        const earnings = data.earnings || [];
+        const redeemed = data.redeemed || [];
+        // All new users start at 0 EcoCoins; coins only increase from real recycling entries
+        const legitCoins = earnings.length === 0 ? 0 : calculateEcoCoins(earnings, redeemed);
+        setTotalPts(legitCoins);
+        ls.set(`ww_pts_${user.email}`, legitCoins);
         ls.set(`ww_scans_${user.email}`, data.scanCount);
         ls.set(`ww_badges_${user.email}`, data.badges);
         if (data.history?.length) ls.set(`ww_history_${user.email}`, data.history);
         if (data.earnings?.length) ls.set(`ww_earn_${user.email}`, data.earnings);
         if (data.redeemed?.length) ls.set(`ww_redeemed_${user.email}`, data.redeemed);
+        if (supabase && data.ecoCoins !== legitCoins) {
+          try {
+            await supabase.from("profiles").update({ eco_coins: legitCoins, updated_at: new Date().toISOString() }).eq("id", user.id);
+          } catch (e) {
+            console.warn("Syncing legit EcoCoins error:", e);
+          }
+        }
       } else {
-        setTotalPts(ls.get(`ww_pts_${user.email}`, 0));
+        const pts = getLegitUserPoints(user.email);
+        setTotalPts(pts);
       }
     };
     loadUserData();
@@ -2385,7 +2435,8 @@ export default function App() {
   const handleLogin = (u) => {
     ls.set("ww_currentUser", u);
     setUser(u);
-    setTotalPts(ls.get(`ww_pts_${u.email}`, 0));
+    const pts = getLegitUserPoints(u.email);
+    setTotalPts(pts);
   };
 
   const handleLogout = async () => {
@@ -2457,19 +2508,6 @@ export default function App() {
         totalEarned: entry.earned,
         items: [entry],
       }, newPts);
-    }
-  }, [user]);
-
-  const handleResetEcoCoins = useCallback(async () => {
-    if (!user) return;
-    ls.set(`ww_pts_${user.email}`, 0);
-    setTotalPts(0);
-    if (isSupabaseConfigured && user.id && supabase) {
-      try {
-        await supabase.from("profiles").update({ eco_coins: 0, updated_at: new Date().toISOString() }).eq("id", user.id);
-      } catch (e) {
-        console.warn("Failed to reset Supabase coins:", e);
-      }
     }
   }, [user]);
 
@@ -2569,12 +2607,7 @@ export default function App() {
                 <div style={{fontSize:11,color:t.textDim,fontFamily:"'Outfit',sans-serif"}}>{s.label}</div>
               </div>
             ))}
-            {totalPts > 0 && (
-              <button onClick={handleResetEcoCoins} title="Reset EcoCoins to 0 for testing" style={{background:"transparent",border:"none",color:t.textDim,fontSize:10,cursor:"pointer",textDecoration:"underline",fontFamily:"'Outfit',sans-serif",padding:0,marginBottom:8,display:"block"}}>
-                ↺ Reset EcoCoins to 0
-              </button>
-            )}
-            <button onClick={()=>setShowSignOut(true)} style={{width:"100%",marginTop:4,padding:"9px",borderRadius:10,background:"transparent",border:`1px solid ${t.red}25`,color:t.red,cursor:"pointer",fontSize:12,fontWeight:600,fontFamily:"'Outfit',sans-serif"}}>👋 Sign Out</button>
+            <button onClick={()=>setShowSignOut(true)} style={{width:"100%",marginTop:8,padding:"9px",borderRadius:10,background:"transparent",border:`1px solid ${t.red}25`,color:t.red,cursor:"pointer",fontSize:12,fontWeight:600,fontFamily:"'Outfit',sans-serif"}}>👋 Sign Out</button>
           </div>
         </div>
 
@@ -2584,7 +2617,7 @@ export default function App() {
           {page==="earnings" && <EarningsPage user={user} t={t} isDark={isDark} onEarnEcoCoins={handleEarnEcoCoins}/>}
           {page==="rewards"  && <RewardsPage  user={user} t={t} isDark={isDark} totalPts={totalPts} onSpend={handleSpend}/>}
           {page==="sdg"      && <SDGPage t={t} isDark={isDark}/>}
-          {page==="dashboard"&& <DashboardPage user={user} t={t} isDark={isDark} onResetCoins={handleResetEcoCoins}/>}
+          {page==="dashboard"&& <DashboardPage user={user} t={t} isDark={isDark} totalPts={totalPts}/>}
           <p style={{textAlign:"center",color:t.textDim,fontSize:11,marginTop:32,letterSpacing:1.5,fontFamily:"'Outfit',sans-serif"}}>GO · INDIA 🌍</p>
         </div>
 
